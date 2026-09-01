@@ -35,6 +35,18 @@ def get_client() -> OpenAI:
     return OpenAI(base_url=OPENROUTER_BASE_URL, api_key=api_key)
 
 
+def fetch_model_catalog() -> list[str]:
+    """Fetch available model IDs from OpenRouter; fall back to defaults on failure."""
+    fallback = [DEFAULT_DRAFTER_1, DEFAULT_DRAFTER_2, DEFAULT_DRAFTER_3, DEFAULT_JUDGE]
+    try:
+        client = get_client()
+        models = client.models.list()
+        ids = [m.id for m in models.data]
+        return ids if ids else fallback
+    except Exception:  # noqa: BLE001 - any failure falls back to the static default list
+        return fallback
+
+
 def call_drafter(model: str, query: str) -> DrafterResult:
     try:
         client = get_client()
