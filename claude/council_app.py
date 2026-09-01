@@ -2,12 +2,15 @@
 
 import os
 import random
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from pathlib import Path
 
+import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
 
-load_dotenv()
+load_dotenv(Path(__file__).with_name(".env"))
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
@@ -32,19 +35,25 @@ class JudgeResult:
 
 def get_client() -> OpenAI:
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
-    return OpenAI(base_url=OPENROUTER_BASE_URL, api_key=api_key)
+    return OpenAI(base_url=OPENROUTER_BASE_URL, api_key=api_key, timeout=60)
 
 
-def fetch_model_catalog() -> list[str]:
-    """Fetch available model IDs from OpenRouter; fall back to defaults on failure."""
+def fetch_model_catalog() -> tuple[list[str], bool]:
+    """Fetch available model IDs from OpenRouter; fall back to defaults on failure.
+
+    Returns (ids, is_fallback) where is_fallback is True only when the live
+    catalog fetch failed or returned no models.
+    """
     fallback = [DEFAULT_DRAFTER_1, DEFAULT_DRAFTER_2, DEFAULT_DRAFTER_3, DEFAULT_JUDGE]
     try:
         client = get_client()
         models = client.models.list()
         ids = [m.id for m in models.data]
-        return ids if ids else fallback
+        if ids:
+            return ids, False
+        return fallback, True
     except Exception:  # noqa: BLE001 - any failure falls back to the static default list
-        return fallback
+        return fallback, True
 
 
 def call_drafter(model: str, query: str) -> DrafterResult:
@@ -55,6 +64,10 @@ def call_drafter(model: str, query: str) -> DrafterResult:
             messages=[{"role": "user", "content": query}],
         )
         text = response.choices[0].message.content
+        if not text:
+            return DrafterResult(
+                model_name=model, response_text=None, error="Model returned an empty response"
+            )
         return DrafterResult(model_name=model, response_text=text, error=None)
     except Exception as exc:  # noqa: BLE001 - surface any provider/network error to the UI
         return DrafterResult(model_name=model, response_text=None, error=str(exc))
@@ -82,6 +95,8 @@ def call_judge(model: str, query: str, anonymized: list[tuple[str, str]]) -> Jud
             messages=[{"role": "user", "content": prompt}],
         )
         text = response.choices[0].message.content
+        if not text:
+            return JudgeResult(verdict_text=None, error="Model returned an empty response")
         return JudgeResult(verdict_text=text, error=None)
     except Exception as exc:  # noqa: BLE001
         return JudgeResult(verdict_text=None, error=str(exc))
@@ -99,11 +114,6 @@ def anonymize_results(results: list[DrafterResult]) -> tuple[list[tuple[str, str
     labeled = [(label, r.response_text) for label, r in zip(labels, shuffled)]
     mapping = {label: r.model_name for label, r in zip(labels, shuffled)}
     return labeled, mapping
-
-
-from concurrent.futures import ThreadPoolExecutor
-
-import streamlit as st
 
 
 AGORA_CSS = """
@@ -156,14 +166,6 @@ h1 {
     color: #0b0c0f;
 }
 
-[data-testid="stVerticalBlockBorderWrapper"],
-[data-testid="column"] > div {
-    background-color: var(--agora-panel);
-    border: 1px solid var(--agora-border);
-    border-radius: 10px;
-    padding: 1rem;
-}
-
 [data-testid="stTextArea"] textarea {
     background-color: var(--agora-panel);
     color: var(--agora-text);
@@ -175,7 +177,8 @@ h1 {
 
 
 def render_sidebar(catalog: list[str]) -> dict[str, str]:
-    st.sidebar.header("Model roster")
+    if st.session_state.get("catalog_is_fallback"):
+        st.sidebar.warning("Live model catalog unavailable — showing defaults only.")
     with st.sidebar.expander("Model roster", expanded=True):
         seats = {
             "Drafter 1": DEFAULT_DRAFTER_1,
@@ -201,6 +204,11 @@ def run_drafters(models: list[str], query: str) -> list[DrafterResult]:
 def main() -> None:
     st.set_page_config(page_title="Model Council", layout="wide")
     st.markdown(AGORA_CSS, unsafe_allow_html=True)
+
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        st.error("Set OPENROUTER_API_KEY in claude/.env")
+        return
+
     st.title("Model Council")
     st.caption(
         "Three drafter models answer independently; a judge model from a "
@@ -209,10 +217,9 @@ def main() -> None:
 
     if "model_catalog" not in st.session_state:
         with st.spinner("Loading model catalog..."):
-            catalog = fetch_model_catalog()
+            catalog, is_fallback = fetch_model_catalog()
         st.session_state["model_catalog"] = catalog
-        if catalog == [DEFAULT_DRAFTER_1, DEFAULT_DRAFTER_2, DEFAULT_DRAFTER_3, DEFAULT_JUDGE]:
-            st.sidebar.warning("Live model catalog unavailable — showing defaults only.")
+        st.session_state["catalog_is_fallback"] = is_fallback
 
     selections = render_sidebar(st.session_state["model_catalog"])
 
@@ -224,32 +231,53 @@ def main() -> None:
         with st.spinner("Running drafters..."):
             results = run_drafters(drafter_models, query)
 
+        labeled, mapping = anonymize_results(results)
+
+        if not labeled:
+            st.session_state["last_results"] = results
+            st.session_state["last_mapping"] = {}
+            st.session_state["last_judge"] = None
+            st.session_state["last_no_responses"] = True
+            st.session_state["has_run"] = True
+        else:
+            with st.spinner("Running judge..."):
+                judge_result = call_judge(selections["Judge"], query, labeled)
+
+            st.session_state["last_results"] = results
+            st.session_state["last_mapping"] = mapping
+            st.session_state["last_judge"] = judge_result
+            st.session_state["last_no_responses"] = False
+            st.session_state["has_run"] = True
+    elif run_clicked:
+        st.warning("Enter a query first.")
+
+    if st.session_state.get("has_run"):
+        results = st.session_state.get("last_results") or []
         cols = st.columns(3)
         for col, result in zip(cols, results):
             with col:
-                st.subheader(result.model_name)
-                if result.error:
-                    st.error(result.error)
-                else:
-                    st.write(result.response_text)
+                with st.container(border=True):
+                    st.subheader(result.model_name)
+                    if result.error:
+                        st.error(result.error)
+                    else:
+                        st.write(result.response_text)
 
-        labeled, mapping = anonymize_results(results)
-        if not labeled:
+        if st.session_state.get("last_no_responses"):
             st.error("No responses available to judge.")
-            return
-
-        with st.spinner("Running judge..."):
-            judge_result = call_judge(selections["Judge"], query, labeled)
-
-        st.subheader("Judge verdict")
-        if judge_result.error:
-            st.warning(f"Judge unavailable: {judge_result.error}")
         else:
-            st.write(judge_result.verdict_text)
+            judge_result: JudgeResult | None = st.session_state.get("last_judge")
+            mapping = st.session_state.get("last_mapping") or {}
             mapping_str = ", ".join(f"{label} = {model}" for label, model in mapping.items())
-            st.caption(mapping_str)
-    elif run_clicked:
-        st.warning("Enter a query first.")
+
+            st.subheader("Judge verdict")
+            with st.container(border=True):
+                if judge_result is not None and judge_result.error:
+                    st.warning(f"Judge unavailable: {judge_result.error}")
+                    st.caption(mapping_str)
+                elif judge_result is not None:
+                    st.write(judge_result.verdict_text)
+                    st.caption(mapping_str)
 
 
 if __name__ == "__main__":
