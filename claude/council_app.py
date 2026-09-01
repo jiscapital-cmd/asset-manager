@@ -99,3 +99,158 @@ def anonymize_results(results: list[DrafterResult]) -> tuple[list[tuple[str, str
     labeled = [(label, r.response_text) for label, r in zip(labels, shuffled)]
     mapping = {label: r.model_name for label, r in zip(labels, shuffled)}
     return labeled, mapping
+
+
+from concurrent.futures import ThreadPoolExecutor
+
+import streamlit as st
+
+
+AGORA_CSS = """
+<style>
+:root {
+    --agora-bg: #0b0c0f;
+    --agora-panel: #16181d;
+    --agora-border: #2a2d34;
+    --agora-text: #e8e9ec;
+    --agora-muted: #9098a3;
+    --agora-accent: #6ee7b7;
+}
+
+html, body, [class*="css"] {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+}
+
+[data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+    background-color: var(--agora-bg);
+    color: var(--agora-text);
+}
+
+[data-testid="stSidebar"] {
+    background-color: var(--agora-panel);
+    border-right: 1px solid var(--agora-border);
+}
+
+h1 {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--agora-text);
+}
+
+[data-testid="stCaptionContainer"], .stCaption, small {
+    color: var(--agora-muted) !important;
+}
+
+.stButton button {
+    background-color: var(--agora-accent);
+    color: #0b0c0f;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 0.5rem 1.25rem;
+    transition: opacity 0.15s ease;
+}
+
+.stButton button:hover {
+    opacity: 0.85;
+    color: #0b0c0f;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"],
+[data-testid="column"] > div {
+    background-color: var(--agora-panel);
+    border: 1px solid var(--agora-border);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+[data-testid="stTextArea"] textarea {
+    background-color: var(--agora-panel);
+    color: var(--agora-text);
+    border: 1px solid var(--agora-border);
+    border-radius: 8px;
+}
+</style>
+"""
+
+
+def render_sidebar(catalog: list[str]) -> dict[str, str]:
+    st.sidebar.header("Model roster")
+    with st.sidebar.expander("Model roster", expanded=True):
+        seats = {
+            "Drafter 1": DEFAULT_DRAFTER_1,
+            "Drafter 2": DEFAULT_DRAFTER_2,
+            "Drafter 3": DEFAULT_DRAFTER_3,
+            "Judge": DEFAULT_JUDGE,
+        }
+        selections = {}
+        for seat_name, default_model in seats.items():
+            options = catalog if default_model in catalog else [default_model] + catalog
+            selections[seat_name] = st.selectbox(
+                seat_name, options=options, index=options.index(default_model)
+            )
+    return selections
+
+
+def run_drafters(models: list[str], query: str) -> list[DrafterResult]:
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(call_drafter, model, query) for model in models]
+        return [f.result() for f in futures]
+
+
+def main() -> None:
+    st.set_page_config(page_title="Model Council", layout="wide")
+    st.markdown(AGORA_CSS, unsafe_allow_html=True)
+    st.title("Model Council")
+    st.caption(
+        "Three drafter models answer independently; a judge model from a "
+        "different lab evaluates anonymized responses and picks a winner."
+    )
+
+    if "model_catalog" not in st.session_state:
+        with st.spinner("Loading model catalog..."):
+            catalog = fetch_model_catalog()
+        st.session_state["model_catalog"] = catalog
+        if catalog == [DEFAULT_DRAFTER_1, DEFAULT_DRAFTER_2, DEFAULT_DRAFTER_3, DEFAULT_JUDGE]:
+            st.sidebar.warning("Live model catalog unavailable — showing defaults only.")
+
+    selections = render_sidebar(st.session_state["model_catalog"])
+
+    query = st.text_area("Your query", height=100)
+    run_clicked = st.button("Run Council", type="primary")
+
+    if run_clicked and query.strip():
+        drafter_models = [selections["Drafter 1"], selections["Drafter 2"], selections["Drafter 3"]]
+        with st.spinner("Running drafters..."):
+            results = run_drafters(drafter_models, query)
+
+        cols = st.columns(3)
+        for col, result in zip(cols, results):
+            with col:
+                st.subheader(result.model_name)
+                if result.error:
+                    st.error(result.error)
+                else:
+                    st.write(result.response_text)
+
+        labeled, mapping = anonymize_results(results)
+        if not labeled:
+            st.error("No responses available to judge.")
+            return
+
+        with st.spinner("Running judge..."):
+            judge_result = call_judge(selections["Judge"], query, labeled)
+
+        st.subheader("Judge verdict")
+        if judge_result.error:
+            st.warning(f"Judge unavailable: {judge_result.error}")
+        else:
+            st.write(judge_result.verdict_text)
+            mapping_str = ", ".join(f"{label} = {model}" for label, model in mapping.items())
+            st.caption(mapping_str)
+    elif run_clicked:
+        st.warning("Enter a query first.")
+
+
+if __name__ == "__main__":
+    main()
