@@ -126,11 +126,16 @@ separate from `raw_docs/` so it's never mistaken for a source document during in
 Google Drive, structure: `JIS Capital - Knowledge Base/raw_docs/<property>/{financial,pm,capex,general}/`
 — already created for the four pilot properties. Chosen over local disk for
 multi-device access without extra code (Drive sync); accessed programmatically via the
-**Google Drive MCP server** rather than a hand-written API client.
+**Google Drive API v3** (`google-api-python-client` + a service account). Note: MCP was
+used to create this folder structure interactively during this design process, but that
+MCP connector is specific to the design conversation's own tooling — `ingest.py` runs as
+a standalone script/cron job and needs its own credentials, so it calls the Drive API
+directly rather than standing up a separate MCP server that would just wrap the same
+calls with no functional benefit.
 
 ### Ingestion (`ingest.py`, offline, on demand — never part of a live run)
 
-1. Walk the Drive `raw_docs/` tree via the Drive MCP server; `property_id` and
+1. Walk the Drive `raw_docs/` tree via the Drive API; `property_id` and
    `source_type` come from the folder path itself.
 2. Load each file's text by type (PDF → per-page extraction, .docx → paragraph
    extraction, CSV/text → direct read).
@@ -150,9 +155,10 @@ comparison, not embedded into Chroma.
 
 ### Future: ResMan
 
-Starts as manual export into Drive. A **ResMan MCP server** is the designed upgrade
-path to live queries, bypassing `raw_docs/` entirely — subagents' retrieval tools don't
-need to change to support it.
+Starts as manual export into Drive. A live ResMan API integration (MCP-wrapped only if
+ResMan or a third party ever ships a server for it) is the upgrade path to live queries,
+bypassing `raw_docs/` entirely — subagents' retrieval tools don't need to change to
+support it.
 
 ## 5. Front-end
 
@@ -168,9 +174,12 @@ mechanical extraction work).
 
 ## 6. Tools & automation
 
-- **MCP** replaces hand-written API clients for external systems: Google Drive now,
-  ResMan in the future. Not used for subagent delegation itself (that's internal to
-  `deepagents`'s `task` tool).
+- **External APIs**: `ingest.py` calls the Google Drive API v3 directly (service
+  account credentials), and would call ResMan's API directly if/when that integration
+  is built. MCP is not part of the shipped system — it was this design conversation's
+  own tooling for creating the Drive folder structure, not something a standalone
+  script or scheduled job can rely on without standing up (and maintaining) a separate
+  MCP server that would just wrap the same API calls.
 - **n8n — now built, not just hooked:**
   - **Scheduled review workflow:** a cron trigger invokes the orchestrator for each
     property (and/or the portfolio) on a set cadence, saves the resulting report to the
@@ -200,7 +209,7 @@ n8n sits entirely outside the orchestrator's reasoning loop — it *triggers* ru
 
 - Multi-user access control / per-user property scoping
 - Hosted/cloud deployment, persisted checkpointer, hosted Chroma
-- Live ResMan API/MCP integration (manual Drive export for now)
+- Live ResMan API integration (manual Drive export for now)
 - Formal evaluation harness beyond LangSmith tracing
 - A dedicated compliance/insurance or vendor-management agent (folds into `pm-agent`/`general` documents for now)
 
@@ -210,7 +219,9 @@ n8n sits entirely outside the orchestrator's reasoning loop — it *triggers* ru
   confirmed realistic; reserve studies, condition reports, contractor bids, and
   leasing/marketing reports may need requesting)
 - Concrete default model choice and per-agent override defaults
-- Whether `ingest.py`'s Drive MCP walk needs pagination handling for larger folders
+- Whether `ingest.py`'s Drive API walk needs pagination handling for larger folders
+- How the service account gets access to the four property folders (share the Drive
+  folder with the service account's email, same as sharing with a person)
 - Scheduled review cadence (weekly? monthly?) and per-property vs. portfolio digest
   format for the n8n workflow
 - PDF/Word export library choice and template design
