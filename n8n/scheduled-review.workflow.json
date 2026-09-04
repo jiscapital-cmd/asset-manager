@@ -1,0 +1,56 @@
+{
+  "name": "Asset Manager - Scheduled Review",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 6 1 * *" }]
+        }
+      },
+      "name": "Monthly Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/reviews/run",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": { "timeout": 600000 }
+      },
+      "name": "Run Reviews",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": { "type": "number", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "name": "Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 300]
+    }
+  ],
+  "connections": {
+    "Monthly Trigger": { "main": [[{ "node": "Run Reviews", "type": "main", "index": 0 }]] },
+    "Run Reviews": { "main": [[{ "node": "Succeeded?", "type": "main", "index": 0 }]] }
+  },
+  "meta": {
+    "description": "Calls the Asset Manager automation API (asset_manager.automation.api) on the 1st of every month at 6am. The API itself sends Slack notifications per property (see SlackWebhookNotifier) — this workflow's job is purely triggering the run, matching the spec's requirement that n8n triggers/reacts but the orchestrator never waits on it."
+  }
+}
