@@ -44,7 +44,13 @@ def run_scheduled_review(
         )
         notify_fn(f"Scheduled review for {property_id} is ready.")
         if send_file_fn is not None:
-            send_file_fn(f"{property_id}-report.pdf", pdf_bytes)
+            # The report already generated and notified successfully — a
+            # Slack upload problem (bad token, bot not invited to the
+            # channel, network error) must not crash the whole response.
+            try:
+                send_file_fn(f"{property_id}-report.pdf", pdf_bytes)
+            except Exception as exc:
+                notify_fn(f"Scheduled review for {property_id}: file upload failed: {exc}")
 
     return results
 
@@ -71,7 +77,10 @@ def run_portfolio_review(
     pdf_bytes = export_pdf_fn("portfolio", report_text)
     notify_fn("Scheduled portfolio review is ready.")
     if send_file_fn is not None:
-        send_file_fn("portfolio-report.pdf", pdf_bytes)
+        try:
+            send_file_fn("portfolio-report.pdf", pdf_bytes)
+        except Exception as exc:
+            notify_fn(f"Scheduled portfolio review: file upload failed: {exc}")
     return ScheduledReviewResult(
         property_id="portfolio",
         report_text=report_text,

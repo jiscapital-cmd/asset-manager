@@ -95,6 +95,30 @@ def test_run_scheduled_review_sends_pdf_file_when_send_file_fn_given():
     assert content == b"pdf-bytes"
 
 
+def test_run_scheduled_review_survives_send_file_fn_raising():
+    """A Slack upload failure (bad token, bot not in channel, network
+    error, ...) must not crash the whole review — the property's report
+    was already generated and notified successfully."""
+    notified = []
+
+    def failing_send_file(filename, content):
+        raise RuntimeError("not_in_channel")
+
+    results = run_scheduled_review(
+        property_ids=["champions-pointe"],
+        run_review_fn=lambda property_id: f"# Report for {property_id}",
+        export_docx_fn=lambda t, c: b"docx-bytes",
+        export_pdf_fn=lambda t, c: b"pdf-bytes",
+        notify_fn=lambda m: notified.append(m),
+        send_file_fn=failing_send_file,
+    )
+
+    assert len(results) == 1
+    assert results[0].property_id == "champions-pointe"
+    assert any("ready" in m.lower() for m in notified)
+    assert any("file upload" in m.lower() or "not_in_channel" in m for m in notified)
+
+
 def test_run_scheduled_review_does_not_send_file_for_failed_property():
     sent_files = []
 
@@ -129,6 +153,26 @@ def test_run_portfolio_review_sends_pdf_file_when_send_file_fn_given():
     filename, content = sent_files[0]
     assert "portfolio" in filename
     assert content == b"pdf-bytes"
+
+
+def test_run_portfolio_review_survives_send_file_fn_raising():
+    notified = []
+
+    def failing_send_file(filename, content):
+        raise RuntimeError("not_in_channel")
+
+    result = run_portfolio_review(
+        run_portfolio_review_fn=lambda: "# Portfolio Review",
+        export_docx_fn=lambda t, c: b"docx-bytes",
+        export_pdf_fn=lambda t, c: b"pdf-bytes",
+        notify_fn=lambda m: notified.append(m),
+        send_file_fn=failing_send_file,
+    )
+
+    assert result is not None
+    assert result.property_id == "portfolio"
+    assert any("ready" in m.lower() for m in notified)
+    assert any("file upload" in m.lower() or "not_in_channel" in m for m in notified)
 
 
 def test_run_portfolio_review_returns_none_and_notifies_on_failure():
