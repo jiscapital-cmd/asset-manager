@@ -44,3 +44,31 @@ def run_scheduled_review(
         notify_fn(f"Scheduled review for {property_id} is ready.")
 
     return results
+
+
+def run_portfolio_review(
+    run_portfolio_review_fn: Callable[[], str],
+    export_docx_fn: Callable[[str, str], bytes],
+    export_pdf_fn: Callable[[str, str], bytes],
+    notify_fn: Callable[[str], None],
+) -> ScheduledReviewResult | None:
+    """Runs one cross-property portfolio review (spec Section 2, "Portfolio vs.
+    property-specific queries") as its own scheduled job, distinct from the N
+    single-property reviews run_scheduled_review produces. Archived under
+    property_id "portfolio", matching the orchestrator prompt's convention
+    (spec Section 2, "Output shape")."""
+    try:
+        report_text = run_portfolio_review_fn()
+    except Exception as exc:
+        notify_fn(f"Scheduled portfolio review failed: {exc}")
+        return None
+
+    docx_bytes = export_docx_fn("portfolio", report_text)
+    pdf_bytes = export_pdf_fn("portfolio", report_text)
+    notify_fn("Scheduled portfolio review is ready.")
+    return ScheduledReviewResult(
+        property_id="portfolio",
+        report_text=report_text,
+        docx_bytes=docx_bytes,
+        pdf_bytes=pdf_bytes,
+    )

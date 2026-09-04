@@ -1,4 +1,4 @@
-from asset_manager.automation.scheduled_review import run_scheduled_review
+from asset_manager.automation.scheduled_review import run_portfolio_review, run_scheduled_review
 
 
 def test_run_scheduled_review_runs_each_property_and_notifies():
@@ -52,3 +52,43 @@ def test_run_scheduled_review_continues_after_one_property_fails():
     succeeded_ids = [r.property_id for r in results]
     assert succeeded_ids == ["champions-pointe", "garfield-vista"]
     assert any("memorial-apartments" in m and "failed" in m.lower() for m in notified)
+
+
+def test_run_portfolio_review_returns_result_and_notifies():
+    notified = []
+
+    def fake_run_portfolio_review() -> str:
+        return "# Portfolio Review\nGarfield Vista has the highest CapEx risk."
+
+    result = run_portfolio_review(
+        run_portfolio_review_fn=fake_run_portfolio_review,
+        export_docx_fn=lambda t, c: b"docx-bytes",
+        export_pdf_fn=lambda t, c: b"pdf-bytes",
+        notify_fn=lambda m: notified.append(m),
+    )
+
+    assert result is not None
+    assert result.property_id == "portfolio"
+    assert "Garfield Vista" in result.report_text
+    assert result.docx_bytes == b"docx-bytes"
+    assert result.pdf_bytes == b"pdf-bytes"
+    assert len(notified) == 1
+    assert "ready" in notified[0].lower()
+
+
+def test_run_portfolio_review_returns_none_and_notifies_on_failure():
+    notified = []
+
+    def flaky_run_portfolio_review() -> str:
+        raise RuntimeError("orchestrator timed out")
+
+    result = run_portfolio_review(
+        run_portfolio_review_fn=flaky_run_portfolio_review,
+        export_docx_fn=lambda t, c: b"docx",
+        export_pdf_fn=lambda t, c: b"pdf",
+        notify_fn=lambda m: notified.append(m),
+    )
+
+    assert result is None
+    assert len(notified) == 1
+    assert "failed" in notified[0].lower()

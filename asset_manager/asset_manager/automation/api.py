@@ -1,16 +1,23 @@
 """HTTP endpoint n8n's Schedule Trigger -> HTTP Request node calls."""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from asset_manager.automation.scheduled_review import run_scheduled_review
+from asset_manager.automation.scheduled_review import run_portfolio_review, run_scheduled_review
 
 
 class RunReviewsRequest(BaseModel):
     property_ids: list[str] = []
 
 
-def create_app(all_property_ids, run_review_fn, export_docx_fn, export_pdf_fn, notify_fn) -> FastAPI:
+def create_app(
+    all_property_ids,
+    run_review_fn,
+    export_docx_fn,
+    export_pdf_fn,
+    notify_fn,
+    run_portfolio_review_fn=None,
+) -> FastAPI:
     app = FastAPI(title="Asset Manager Automation API")
 
     @app.get("/health")
@@ -28,6 +35,22 @@ def create_app(all_property_ids, run_review_fn, export_docx_fn, export_pdf_fn, n
             notify_fn=notify_fn,
         )
         return {"reviewed": [r.property_id for r in results]}
+
+    @app.post("/reviews/run-portfolio")
+    def run_portfolio_review_endpoint():
+        # Distinct from POST /reviews/run's N single-property reviews — this
+        # produces one cross-property digest (spec Section 2, "Portfolio vs.
+        # property-specific queries"), matching the plan's "known gap" note
+        # that scheduled jobs previously never invoked portfolio mode.
+        if run_portfolio_review_fn is None:
+            raise HTTPException(status_code=501, detail="Portfolio review is not configured for this app.")
+        result = run_portfolio_review(
+            run_portfolio_review_fn=run_portfolio_review_fn,
+            export_docx_fn=export_docx_fn,
+            export_pdf_fn=export_pdf_fn,
+            notify_fn=notify_fn,
+        )
+        return {"reviewed": [result.property_id] if result is not None else []}
 
     return app
 
@@ -71,9 +94,9 @@ def build_production_app() -> FastAPI:
         k.removeprefix("PROPERTY_FOLDER_").lower() for k in os.environ if k.startswith("PROPERTY_FOLDER_")
     ]
 
-    def run_review_fn(property_id: str) -> str:
+    def _build_orchestrator():
         model = ChatOpenAI(model=os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini"), base_url="https://openrouter.ai/api/v1")
-        orchestrator = build_orchestrator(
+        return build_orchestrator(
             model,
             make_retrieval_tool(store, "financial"),
             make_retrieval_tool(store, "pm"),
@@ -82,7 +105,21 @@ def build_production_app() -> FastAPI:
             make_list_properties_tool(all_property_ids),
             make_save_report_tool(archive),
         )
+
+    def run_review_fn(property_id: str) -> str:
+        orchestrator = _build_orchestrator()
         question = f"Review property {property_id} and produce this period's report."
+        result = orchestrator.invoke({"messages": [{"role": "user", "content": question}]})
+        return result["messages"][-1].content
+
+    def run_portfolio_review_fn() -> str:
+        # A distinct scheduled call using the orchestrator's portfolio-mode
+        # prompt path (spec Section 2) — not just N single-property reviews.
+        orchestrator = _build_orchestrator()
+        question = (
+            "Give me a portfolio-level review comparing all properties on financial, "
+            "occupancy, and CapEx risk, ranked, and produce this period's cross-property report."
+        )
         result = orchestrator.invoke({"messages": [{"role": "user", "content": question}]})
         return result["messages"][-1].content
 
@@ -92,4 +129,5 @@ def build_production_app() -> FastAPI:
         export_docx_fn=markdown_to_docx_bytes,
         export_pdf_fn=markdown_to_pdf_bytes,
         notify_fn=notifier.send,
+        run_portfolio_review_fn=run_portfolio_review_fn,
     )

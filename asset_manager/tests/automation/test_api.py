@@ -37,3 +37,31 @@ def test_run_reviews_defaults_to_all_configured_properties():
     assert response.status_code == 200
     body = response.json()
     assert sorted(body["reviewed"]) == ["champions-pointe", "memorial-apartments"]
+
+
+def test_run_portfolio_review_returns_501_when_not_configured():
+    client = TestClient(_build_test_app())
+    response = client.post("/reviews/run-portfolio")
+    assert response.status_code == 501
+
+
+def test_run_portfolio_review_returns_200_when_configured():
+    def fake_run_review(property_id: str) -> str:
+        return f"# Report for {property_id}"
+
+    def fake_run_portfolio_review() -> str:
+        return "# Portfolio Review\nGarfield Vista has the highest CapEx risk."
+
+    app = create_app(
+        all_property_ids=["champions-pointe", "memorial-apartments"],
+        run_review_fn=fake_run_review,
+        export_docx_fn=lambda t, c: b"docx",
+        export_pdf_fn=lambda t, c: b"pdf",
+        notify_fn=lambda m: None,
+        run_portfolio_review_fn=fake_run_portfolio_review,
+    )
+    client = TestClient(app)
+    response = client.post("/reviews/run-portfolio")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["reviewed"] == ["portfolio"]
