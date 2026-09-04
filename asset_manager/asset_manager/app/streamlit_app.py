@@ -93,12 +93,22 @@ def get_orchestrator(model_name: str):
 
 
 # --- Live "agent steps" panel -----------------------------------------------
-# The orchestrator delegates to subagents via a single "task" tool (args:
-# subagent_type, description) — deepagents' shared delegation mechanism, not
-# specific to this project. Every other tool call (retrieve_*_documents,
-# list_properties, get_prior_report, save_report) is one this project
-# defines. We label each by tool name/args so the panel reads as "financial-
-# agent is running" rather than raw tool-call JSON.
+# Uses orchestrator.stream(stream_mode="updates", subgraphs=True): the
+# orchestrator delegates to subagents via deepagents' shared "task" tool
+# (args: subagent_type, description), which invokes the subagent's own
+# compiled graph synchronously inside the tool call. With subgraphs=True,
+# that nested graph's own steps stream too, each tagged with a namespace
+# tuple like ("tools:<task_id>",) — this is what actually surfaces each
+# subagent's own retrieve_*_documents calls (full query/property_id args
+# and full result content), not just the top-level delegation.
+#
+# The "task" tool call itself doesn't expose which subagent a given nested
+# namespace belongs to (the id in the namespace is an internal LangGraph
+# task id, not the tool_call id) — so each nested "lane" starts unlabeled
+# and gets resolved to a friendly name from the first subagent-specific
+# tool it calls, since each subagent's tool wiring is unique (only
+# financial-agent calls retrieve_financial_documents, only risk-agent calls
+# get_prior_report, etc. — see agents/subagents.py).
 
 _TOOL_ICONS = {
     "retrieve_financial_documents": "💰",
@@ -107,6 +117,13 @@ _TOOL_ICONS = {
     "get_prior_report": "📜",
     "list_properties": "📋",
     "save_report": "💾",
+}
+
+_SUBAGENT_SIGNAL_TOOLS = {
+    "retrieve_financial_documents": "financial-agent",
+    "retrieve_pm_documents": "pm-agent",
+    "retrieve_capex_documents": "capex-agent",
+    "get_prior_report": "risk-agent",
 }
 
 
@@ -129,22 +146,67 @@ def _describe_tool_call(name: str, args: dict) -> str:
     return f"🔧 Calling `{name}`"
 
 
-def _render_new_messages(messages: list, already_rendered: int, container, call_labels: dict) -> int:
-    """Render messages[already_rendered:] as step lines/expanders in
-    container. Returns the new count of rendered messages."""
-    for message in messages[already_rendered:]:
-        if isinstance(message, AIMessage) and message.tool_calls:
-            for tool_call in message.tool_calls:
-                label = _describe_tool_call(tool_call["name"], tool_call.get("args", {}))
-                call_labels[tool_call["id"]] = label
-                container.markdown(label)
-        elif isinstance(message, ToolMessage):
-            label = call_labels.get(message.tool_call_id, f"🔧 `{message.name}`")
-            content = message.content if isinstance(message.content, str) else str(message.content)
-            preview = content[:400] + ("…" if len(content) > 400 else "")
-            with container.expander(f"✅ {label}", expanded=False):
-                st.markdown(preview)
-    return len(messages)
+class _StepRenderer:
+    """Renders orchestrator.stream(stream_mode="updates", subgraphs=True)
+    output into the steps panel: one titled sub-area ("lane") per nested
+    subagent invocation, resolved to a friendly name once we see a
+    tool call that identifies it (see _SUBAGENT_SIGNAL_TOOLS)."""
+
+    def __init__(self, top_level_container):
+        self._top_level_container = top_level_container
+        self._lanes: dict[tuple, dict] = {}
+        self._call_labels: dict[str, str] = {}
+        self.final_answer: str | None = None
+
+    def _lane_for(self, namespace: tuple) -> dict:
+        if namespace not in self._lanes:
+            if namespace == ():
+                lane = {"title_ph": None, "body": self._top_level_container, "resolved": "Orchestrator"}
+            else:
+                title_ph = self._top_level_container.empty()
+                title_ph.markdown("**🧩 Subagent call — starting…**")
+                body = self._top_level_container.container()
+                lane = {"title_ph": title_ph, "body": body, "resolved": None}
+            self._lanes[namespace] = lane
+        return self._lanes[namespace]
+
+    def _resolve_lane(self, lane: dict, tool_name: str) -> None:
+        if lane["resolved"] is None and tool_name in _SUBAGENT_SIGNAL_TOOLS:
+            lane["resolved"] = _SUBAGENT_SIGNAL_TOOLS[tool_name]
+            if lane["title_ph"] is not None:
+                lane["title_ph"].markdown(f"**🧩 Subagent: {lane['resolved']}**")
+
+    @staticmethod
+    def _as_text(content) -> str:
+        return content if isinstance(content, str) else str(content)
+
+    def render_update(self, namespace: tuple, chunk: dict) -> None:
+        for node_output in chunk.values():
+            if not isinstance(node_output, dict) or "messages" not in node_output:
+                continue  # e.g. deepagents' internal middleware nodes carry no messages
+            lane = self._lane_for(namespace)
+            container = lane["body"]
+            for message in node_output["messages"]:
+                if isinstance(message, AIMessage) and message.tool_calls:
+                    for tool_call in message.tool_calls:
+                        self._resolve_lane(lane, tool_call["name"])
+                        label = _describe_tool_call(tool_call["name"], tool_call.get("args", {}))
+                        self._call_labels[tool_call["id"]] = label
+                        container.markdown(label)
+                        with container.expander("🧾 input", expanded=False):
+                            st.json(tool_call.get("args", {}))
+                elif isinstance(message, ToolMessage):
+                    label = self._call_labels.get(message.tool_call_id, f"🔧 `{message.name}`")
+                    content = self._as_text(message.content)
+                    preview = content[:2000] + ("…" if len(content) > 2000 else "")
+                    with container.expander(f"✅ {label} — output", expanded=False):
+                        st.text(preview)
+                elif isinstance(message, AIMessage) and message.content:
+                    content = self._as_text(message.content)
+                    if namespace == ():
+                        self.final_answer = content
+                    preview = content[:300] + ("…" if len(content) > 300 else "")
+                    container.caption(f"💬 {preview}")
 
 
 if "messages" not in st.session_state:
@@ -183,14 +245,15 @@ with chat_tab:
         model_map = resolve_model_overrides(default_model, overrides)
         orchestrator = get_orchestrator(model_map["financial-agent"])
 
-        rendered_count = 0
-        call_labels: dict[str, str] = {}
-        final_state = None
-        for state in orchestrator.stream({"messages": [{"role": "user", "content": question}]}, stream_mode="values"):
-            final_state = state
-            rendered_count = _render_new_messages(state["messages"], rendered_count, steps_container, call_labels)
+        renderer = _StepRenderer(steps_container)
+        for namespace, chunk in orchestrator.stream(
+            {"messages": [{"role": "user", "content": question}]},
+            stream_mode="updates",
+            subgraphs=True,
+        ):
+            renderer.render_update(namespace, chunk)
 
-        answer = final_state["messages"][-1].content if final_state else "(no response)"
+        answer = renderer.final_answer or "(no response)"
         answer_placeholder.markdown(answer)
         st.session_state.messages.append({"role": "assistant", "content": answer})
 
