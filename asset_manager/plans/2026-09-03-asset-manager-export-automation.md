@@ -17,8 +17,8 @@ test, and is verified by manual import (Task 6).
 PDF generation, no external binary like wkhtmltopdf), `fastapi`, `uvicorn`, `httpx` (test
 client), `requests` (Slack webhook).
 
-**Spec:** `docs/superpowers/specs/2026-09-03-asset-manager-design.md`
-**Depends on:** Plan 1 (`docs/superpowers/plans/2026-09-03-asset-manager-core-pipeline.md`) and Plan 2 (`docs/superpowers/plans/2026-09-03-asset-manager-portfolio-history.md`) — imports `build_orchestrator`, `ReportArchive`, `ChromaStore`, and the tool factories from both.
+**Spec:** `specs/2026-09-03-asset-manager-design.md`
+**Depends on:** Plan 1 (`plans/2026-09-03-asset-manager-core-pipeline.md`) and Plan 2 (`plans/2026-09-03-asset-manager-portfolio-history.md`) — imports `build_orchestrator`, `ReportArchive`, `ChromaStore`, and the tool factories from both.
 
 ## Global Constraints
 

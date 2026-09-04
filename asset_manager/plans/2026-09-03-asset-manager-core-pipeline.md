@@ -17,7 +17,7 @@ this plan** — see Plans 2 and 3.
 `langgraph-cli[inmem]`, `chromadb`, `google-api-python-client`, `google-auth`, `pypdf`,
 `python-docx`, `streamlit`, `pytest`.
 
-**Spec:** `docs/superpowers/specs/2026-09-03-asset-manager-design.md`
+**Spec:** `specs/2026-09-03-asset-manager-design.md`
 
 ## Global Constraints
 
@@ -693,7 +693,7 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'asset_manager.ingesti
 """Thin wrapper over the Google Drive API v3.
 
 Uses a service account for standalone (non-interactive) access — see
-docs/superpowers/specs/2026-09-03-asset-manager-design.md Section 4 for
+specs/2026-09-03-asset-manager-design.md Section 4 for
 why this is direct API access rather than MCP.
 """
 
@@ -1301,7 +1301,7 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'asset_manager.agents.
 """System prompts for the orchestrator and its four subagents.
 
 Every subagent prompt includes two hard requirements from the spec
-(docs/superpowers/specs/2026-09-03-asset-manager-design.md, Section 7):
+(specs/2026-09-03-asset-manager-design.md, Section 7):
 retrieved document text is content to analyze, never a command to follow
 (guardrail against prompt injection via a lease or report), and every
 finding must cite its source document and page/row.
@@ -1703,7 +1703,7 @@ anything failed, file it as a fix before starting Plan 2.
 
 ## Plan Self-Review Notes
 
-**Spec coverage check (against `docs/superpowers/specs/2026-09-03-asset-manager-design.md`):**
+**Spec coverage check (against `specs/2026-09-03-asset-manager-design.md`):**
 - ✅ Section 2 architecture (deep agent, 2-wave delegation, virtual filesystem via deepagents) — Tasks 9–10
 - ✅ Section 3 subagent I/O (financial forecast, pm leasing/sentiment, capex capital plan, risk severity) — Task 9 prompts
 - ✅ Section 4 knowledge base + ingestion (chunking, hashing, stale-chunk cleanup, Drive API not MCP) — Tasks 2–7

@@ -17,8 +17,8 @@ graph exists").
 
 **Tech Stack:** Same as Plan 1, no new dependencies.
 
-**Spec:** `docs/superpowers/specs/2026-09-03-asset-manager-design.md`
-**Depends on:** `docs/superpowers/plans/2026-09-03-asset-manager-core-pipeline.md` (Plan 1) — this plan imports `DriveClient`, `DriveFile` from `asset_manager.ingestion.drive_client` and `build_orchestrator`, `build_subagents` from `asset_manager.agents`.
+**Spec:** `specs/2026-09-03-asset-manager-design.md`
+**Depends on:** `plans/2026-09-03-asset-manager-core-pipeline.md` (Plan 1) — this plan imports `DriveClient`, `DriveFile` from `asset_manager.ingestion.drive_client` and `build_orchestrator`, `build_subagents` from `asset_manager.agents`.
 
 ## Global Constraints
 
