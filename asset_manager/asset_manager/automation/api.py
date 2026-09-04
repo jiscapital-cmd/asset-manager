@@ -76,6 +76,7 @@ def build_production_app() -> FastAPI:
     from asset_manager.ingestion.store import ChromaStore
     from asset_manager.notify.slack import SlackWebhookNotifier
     from asset_manager.reports.archive import ReportArchive
+    from asset_manager.reports.local_store import LocalFileStore
     from asset_manager.retrieval.tools import make_retrieval_tool
 
     load_dotenv()
@@ -87,7 +88,13 @@ def build_production_app() -> FastAPI:
 
     drive = build_drive_client(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
     store = ChromaStore(chromadb.PersistentClient(path="knowledge_base/chroma_db"), embed_fn=embed_fn)
-    archive = ReportArchive(drive, reports_root_folder_id=os.environ["REPORTS_ROOT_FOLDER_ID"])
+    # Local disk, not Drive: a service account has no storage quota of its own
+    # on a personal (non-Workspace) Google Drive, so it can't create new report
+    # files there even with Editor access on the folder (see
+    # ingestion/drive_client.py). REPORTS_ROOT_FOLDER_ID stays unused unless
+    # that changes (e.g. a Workspace Shared Drive becomes available).
+    reports_root = os.environ.get("REPORTS_LOCAL_DIR", "knowledge_base/reports")
+    archive = ReportArchive(LocalFileStore(reports_root), reports_root_folder_id=reports_root)
     notifier = SlackWebhookNotifier(os.environ["SLACK_WEBHOOK_URL"])
 
     all_property_ids = [

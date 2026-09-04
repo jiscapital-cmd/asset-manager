@@ -51,10 +51,15 @@ def _load_property_ids_from_env() -> list[str]:
 
 @st.cache_resource
 def get_archive() -> ReportArchive:
-    from asset_manager.ingestion.drive_client import build_drive_client
+    # Local disk, not Drive: a service account has no storage quota of its
+    # own on a personal (non-Workspace) Google Drive, so it can't create new
+    # report files there even with Editor access on the folder (see
+    # ingestion/drive_client.py). REPORTS_ROOT_FOLDER_ID stays unused unless
+    # that changes (e.g. a Workspace Shared Drive becomes available).
+    from asset_manager.reports.local_store import LocalFileStore
 
-    drive = build_drive_client(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
-    return ReportArchive(drive, reports_root_folder_id=os.environ["REPORTS_ROOT_FOLDER_ID"])
+    reports_root = os.environ.get("REPORTS_LOCAL_DIR", "knowledge_base/reports")
+    return ReportArchive(LocalFileStore(reports_root), reports_root_folder_id=reports_root)
 
 
 def get_orchestrator(model_name: str):

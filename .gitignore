@@ -17,3 +17,7 @@ claude/.env
 service-account.json
 *-service-account.json
 asset_manager/service-account.json
+
+# Local Chroma vector DB and locally-saved reports (generated, not source)
+knowledge_base/
+asset_manager/knowledge_base/
