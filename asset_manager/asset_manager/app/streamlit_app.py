@@ -5,6 +5,7 @@ import os
 import chromadb
 import streamlit as st
 from dotenv import load_dotenv
+from langchain_core.messages import AIMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from openai import OpenAI
 
@@ -21,7 +22,7 @@ from asset_manager.retrieval.tools import make_retrieval_tool
 
 load_dotenv()
 
-st.set_page_config(page_title="Asset Manager", page_icon="🏢")
+st.set_page_config(page_title="Asset Manager", page_icon="🏢", layout="wide")
 st.title("Asset Manager")
 
 with st.sidebar:
@@ -90,26 +91,106 @@ def get_orchestrator(model_name: str):
     )
 
 
+# --- Live "agent steps" panel -----------------------------------------------
+# The orchestrator delegates to subagents via a single "task" tool (args:
+# subagent_type, description) — deepagents' shared delegation mechanism, not
+# specific to this project. Every other tool call (retrieve_*_documents,
+# list_properties, get_prior_report, save_report) is one this project
+# defines. We label each by tool name/args so the panel reads as "financial-
+# agent is running" rather than raw tool-call JSON.
+
+_TOOL_ICONS = {
+    "retrieve_financial_documents": "💰",
+    "retrieve_pm_documents": "🏢",
+    "retrieve_capex_documents": "🔧",
+    "get_prior_report": "📜",
+    "list_properties": "📋",
+    "save_report": "💾",
+}
+
+
+def _describe_tool_call(name: str, args: dict) -> str:
+    if name == "task":
+        subagent = args.get("subagent_type", "?")
+        description = args.get("description") or ""
+        preview = description[:140] + ("…" if len(description) > 140 else "")
+        return f"🚀 Delegating to **{subagent}** — _{preview}_"
+    if name in _TOOL_ICONS:
+        icon = _TOOL_ICONS[name]
+        if name.startswith("retrieve_"):
+            return f"{icon} Retrieving documents for **{args.get('property_id', '?')}**: _{args.get('query', '')}_"
+        if name == "get_prior_report":
+            return f"{icon} Fetching prior report for **{args.get('property_id', '?')}**"
+        if name == "list_properties":
+            return f"{icon} Listing available properties"
+        if name == "save_report":
+            return f"{icon} Saving report for **{args.get('property_id', '?')}**"
+    return f"🔧 Calling `{name}`"
+
+
+def _render_new_messages(messages: list, already_rendered: int, container, call_labels: dict) -> int:
+    """Render messages[already_rendered:] as step lines/expanders in
+    container. Returns the new count of rendered messages."""
+    for message in messages[already_rendered:]:
+        if isinstance(message, AIMessage) and message.tool_calls:
+            for tool_call in message.tool_calls:
+                label = _describe_tool_call(tool_call["name"], tool_call.get("args", {}))
+                call_labels[tool_call["id"]] = label
+                container.markdown(label)
+        elif isinstance(message, ToolMessage):
+            label = call_labels.get(message.tool_call_id, f"🔧 `{message.name}`")
+            content = message.content if isinstance(message.content, str) else str(message.content)
+            preview = content[:400] + ("…" if len(content) > 400 else "")
+            with container.expander(f"✅ {label}", expanded=False):
+                st.markdown(preview)
+    return len(messages)
+
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+chat_col, steps_col = st.columns([2, 1])
+
+with chat_col:
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+with steps_col:
+    st.markdown("### 🔍 Agent steps")
+    steps_placeholder = st.empty()
+    with steps_placeholder.container():
+        st.caption("Steps for the next question will appear here as they happen.")
 
 if question := st.chat_input("Ask about a property..."):
     st.session_state.messages.append({"role": "user", "content": question})
-    with st.chat_message("user"):
-        st.markdown(question)
+    with chat_col:
+        with st.chat_message("user"):
+            st.markdown(question)
 
-    with st.chat_message("assistant"):
-        model_map = resolve_model_overrides(default_model, overrides)
-        orchestrator = get_orchestrator(model_map["financial-agent"])
-        result = orchestrator.invoke({"messages": [{"role": "user", "content": question}]})
-        answer = result["messages"][-1].content
-        st.markdown(answer)
-        st.session_state.messages.append({"role": "assistant", "content": answer})
+        with st.chat_message("assistant"):
+            answer_placeholder = st.empty()
+            answer_placeholder.markdown("_Thinking..._")
 
+    with steps_col:
+        steps_placeholder.empty()
+        steps_container = steps_placeholder.container()
+
+    model_map = resolve_model_overrides(default_model, overrides)
+    orchestrator = get_orchestrator(model_map["financial-agent"])
+
+    rendered_count = 0
+    call_labels: dict[str, str] = {}
+    final_state = None
+    for state in orchestrator.stream({"messages": [{"role": "user", "content": question}]}, stream_mode="values"):
+        final_state = state
+        rendered_count = _render_new_messages(state["messages"], rendered_count, steps_container, call_labels)
+
+    answer = final_state["messages"][-1].content if final_state else "(no response)"
+    answer_placeholder.markdown(answer)
+    st.session_state.messages.append({"role": "assistant", "content": answer})
+
+    with chat_col:
         from asset_manager.export.render import markdown_to_docx_bytes, markdown_to_pdf_bytes
 
         docx_bytes = markdown_to_docx_bytes("Asset Manager Report", answer)
