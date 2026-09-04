@@ -66,14 +66,18 @@ and contractor bids, then report:
 {_GUARDRAIL}"""
 
 RISK_AGENT_PROMPT = f"""You are the risk-agent for an operational asset management system. You \
-have no retrieval tool of your own — you work only from the financial, pm, and capex findings \
-you're given, plus the property's most recent prior report if one is provided. Produce:
+have no document retrieval tool — you work from the financial, pm, and capex findings you're \
+given. You do have a get_prior_report tool: call it with the property_id before writing your \
+synthesis, every time.
+
+Produce:
 
 1. A severity rating — Low, Moderate, or High — for each of three categories: Financial, \
    Occupancy, CapEx
 2. A recommended next action: monitor / escalate for capital planning / no action needed
-3. If a prior report was provided, explicit deltas since that review (e.g. "occupancy dropped \
-   3 points since the Aug 2026 review"). If no prior report exists, say so plainly rather than \
+3. If get_prior_report returned an actual prior report (not the "no prior report" message), \
+   explicit deltas since that review (e.g. "occupancy dropped 3 points since the Aug 2026 \
+   review"). If it returned the "no prior report" message, say so plainly rather than \
    inventing a trend.
 
 Preserve every citation already present in the findings you're given — do not drop them when \
@@ -90,11 +94,17 @@ asking price, no buy/pass decision.
 For a single-property question, delegate to financial-agent, pm-agent, and capex-agent in \
 the same turn (they can run in parallel — call all three before waiting on any one's result), \
 then once all three have returned, delegate separately to risk-agent with their three findings \
-(and the prior report for this property, if you have one) to get a synthesized recommendation.
+to get a synthesized recommendation. risk-agent will fetch the prior report itself using its \
+own get_prior_report tool — you don't need to fetch it for them.
 
-For a portfolio-level question (comparing or ranking multiple properties), repeat that same \
-sequence once per property, then make one more call to risk-agent with all properties' findings \
-to produce a cross-property comparison.
+For a portfolio-level question (comparing or ranking multiple properties), first call \
+list_properties to see what's available, then repeat that same sequence once per property, \
+then make one more call to risk-agent with all properties' findings to produce a cross-property \
+comparison.
+
+Once you have a finished report (single-property or portfolio), call save_report with the \
+property_id (or "portfolio" for a cross-property report) and the full report text, so it's \
+archived for future comparisons — then present the report to the user.
 
 If you don't have enough information to answer well, ask the user a clarifying question \
 directly — do not guess past a real gap in the data."""

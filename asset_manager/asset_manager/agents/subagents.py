@@ -6,7 +6,7 @@ from asset_manager.agents.prompts import (
 )
 
 
-def build_subagents(financial_tool, pm_tool, capex_tool) -> list[dict]:
+def build_subagents(financial_tool, pm_tool, capex_tool, get_prior_report_tool) -> list[dict]:
     return [
         {
             "name": "financial-agent",
@@ -39,10 +39,11 @@ def build_subagents(financial_tool, pm_tool, capex_tool) -> list[dict]:
             "name": "risk-agent",
             "description": (
                 "Synthesizes financial/pm/capex findings into severity scores and a recommended "
-                "action. Call only after financial-agent, pm-agent, and capex-agent have all "
-                "returned for the same property (or properties, for a portfolio question)."
+                "action, diffed against the prior report if one exists. Call only after "
+                "financial-agent, pm-agent, and capex-agent have all returned for the same "
+                "property (or properties, for a portfolio question)."
             ),
             "system_prompt": RISK_AGENT_PROMPT,
-            "tools": [],
+            "tools": [get_prior_report_tool],
         },
     ]

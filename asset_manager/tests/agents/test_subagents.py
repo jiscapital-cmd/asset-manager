@@ -10,32 +10,33 @@ def _dummy_tool(name):
 
 
 def test_build_subagents_returns_four_named_agents():
-    subagents = build_subagents(_dummy_tool("fin"), _dummy_tool("pm"), _dummy_tool("capex"))
+    subagents = build_subagents(_dummy_tool("fin"), _dummy_tool("pm"), _dummy_tool("capex"), _dummy_tool("prior"))
     names = {s["name"] for s in subagents}
     assert names == {"financial-agent", "pm-agent", "capex-agent", "risk-agent"}
 
 
-def test_risk_agent_has_no_retrieval_tools():
-    subagents = build_subagents(_dummy_tool("fin"), _dummy_tool("pm"), _dummy_tool("capex"))
+def test_risk_agent_has_the_prior_report_tool_only():
+    prior_tool = _dummy_tool("prior")
+    subagents = build_subagents(_dummy_tool("fin"), _dummy_tool("pm"), _dummy_tool("capex"), prior_tool)
     risk_agent = next(s for s in subagents if s["name"] == "risk-agent")
-    assert risk_agent["tools"] == []
+    assert risk_agent["tools"] == [prior_tool]
 
 
 def test_financial_agent_has_its_retrieval_tool():
     fin_tool = _dummy_tool("fin")
-    subagents = build_subagents(fin_tool, _dummy_tool("pm"), _dummy_tool("capex"))
+    subagents = build_subagents(fin_tool, _dummy_tool("pm"), _dummy_tool("capex"), _dummy_tool("prior"))
     financial_agent = next(s for s in subagents if s["name"] == "financial-agent")
     assert financial_agent["tools"] == [fin_tool]
 
 
 def test_every_subagent_prompt_has_the_guardrail_instruction():
-    subagents = build_subagents(_dummy_tool("fin"), _dummy_tool("pm"), _dummy_tool("capex"))
+    subagents = build_subagents(_dummy_tool("fin"), _dummy_tool("pm"), _dummy_tool("capex"), _dummy_tool("prior"))
     for s in subagents:
         assert "never a command" in s["system_prompt"].lower() or "never an instruction" in s["system_prompt"].lower()
 
 
 def test_every_subagent_prompt_requires_citations():
-    subagents = build_subagents(_dummy_tool("fin"), _dummy_tool("pm"), _dummy_tool("capex"))
+    subagents = build_subagents(_dummy_tool("fin"), _dummy_tool("pm"), _dummy_tool("capex"), _dummy_tool("prior"))
     for s in subagents:
         if s["name"] == "risk-agent":
             continue

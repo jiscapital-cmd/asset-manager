@@ -38,6 +38,44 @@ class DriveClient:
     def download_file(self, file_id: str) -> bytes:
         return self._service.files().get_media(fileId=file_id).execute()
 
+    def find_or_create_subfolder(self, parent_folder_id: str, name: str) -> str:
+        for folder in self.list_subfolders(parent_folder_id):
+            if folder.name == name:
+                return folder.id
+        response = (
+            self._service.files()
+            .create(
+                body={
+                    "name": name,
+                    "mimeType": "application/vnd.google-apps.folder",
+                    "parents": [parent_folder_id],
+                },
+                fields="id",
+            )
+            .execute()
+        )
+        return response["id"]
+
+    def upload_text_file(self, folder_id: str, filename: str, content: str) -> None:
+        import io
+
+        from googleapiclient.http import MediaIoBaseUpload
+
+        media = MediaIoBaseUpload(io.BytesIO(content.encode("utf-8")), mimetype="text/markdown")
+        existing = next((f for f in self.list_files_in_folder(folder_id) if f.name == filename), None)
+        if existing is not None:
+            self._service.files().update(fileId=existing.id, media_body=media).execute()
+        else:
+            self._service.files().create(
+                body={"name": filename, "parents": [folder_id]}, media_body=media, fields="id"
+            ).execute()
+
+    def download_text_file(self, folder_id: str, filename: str) -> str | None:
+        existing = next((f for f in self.list_files_in_folder(folder_id) if f.name == filename), None)
+        if existing is None:
+            return None
+        return self.download_file(existing.id).decode("utf-8")
+
 
 def build_drive_client(service_account_json_path: str) -> DriveClient:
     """Construct a real DriveClient using a service account credentials file.
