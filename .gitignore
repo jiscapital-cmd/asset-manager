@@ -12,3 +12,8 @@ wheels/
 # Environment variables
 .env
 claude/.env
+
+# Google service account credentials (never commit private keys)
+service-account.json
+*-service-account.json
+asset_manager/service-account.json
