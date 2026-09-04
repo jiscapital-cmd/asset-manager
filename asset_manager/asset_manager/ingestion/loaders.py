@@ -23,6 +23,22 @@ def load_text_file(content: bytes) -> str:
     return content.decode("utf-8")
 
 
+def load_xlsx_text(content: bytes) -> str:
+    """Flatten every sheet's cells into text, prefixed by sheet name — rent
+    rolls and similar property-management exports are frequently .xlsx."""
+    from openpyxl import load_workbook
+
+    wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    lines = []
+    for sheet in wb.worksheets:
+        lines.append(f"# Sheet: {sheet.title}")
+        for row in sheet.iter_rows(values_only=True):
+            cells = [str(c) for c in row if c is not None]
+            if cells:
+                lines.append(", ".join(cells))
+    return "\n".join(lines)
+
+
 def load_document(content: bytes, filename: str) -> list[tuple[int, str]]:
     """Dispatch to the right loader by file extension.
 
@@ -36,4 +52,6 @@ def load_document(content: bytes, filename: str) -> list[tuple[int, str]]:
         return [(1, load_docx_text(content))]
     if lower.endswith((".txt", ".csv", ".md")):
         return [(1, load_text_file(content))]
+    if lower.endswith(".xlsx"):
+        return [(1, load_xlsx_text(content))]
     raise ValueError(f"Unsupported file type: {filename}")

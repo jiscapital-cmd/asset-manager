@@ -81,6 +81,33 @@ def test_run_ingestion_reingests_changed_file(store):
     assert "1.3M" in results[0]["text"]
 
 
+def test_run_ingestion_skips_unsupported_file_and_continues(store):
+    """One file with an unsupported extension (e.g. .xlsx that fails to
+    parse, or any other loader error) must not abort ingestion for the
+    rest of the batch — it should be recorded as failed and skipped."""
+    drive = FakeDrive(
+        subfolders_by_property={
+            "p1-folder": [DriveFile(id="fin-folder", name="financial", modified_time="t", parents=["p1-folder"])],
+        },
+        files_by_source_folder={
+            "fin-folder": [
+                DriveFile(id="bad-file", name="exhibit.xyz", modified_time="t", parents=["fin-folder"]),
+                DriveFile(id="good-file", name="t12.txt", modified_time="t", parents=["fin-folder"]),
+            ],
+        },
+        content_by_file_id={"bad-file": b"unsupported content", "good-file": b"NOI is $1.1M"},
+    )
+    summary = run_ingestion(drive, store, property_folders={"p1": "p1-folder"})
+
+    assert summary.files_failed == 1
+    assert summary.files_added == 1
+    assert any("exhibit.xyz" in name for name in summary.failed_files)
+
+    results = store.query("NOI", source_type="financial", property_id="p1")
+    assert len(results) == 1
+    assert results[0]["filename"] == "t12.txt"
+
+
 def test_run_ingestion_removes_chunks_for_deleted_file(store):
     drive = _drive_with_one_financial_file()
     run_ingestion(drive, store, property_folders={"p1": "p1-folder"})

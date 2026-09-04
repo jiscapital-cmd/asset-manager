@@ -4,7 +4,7 @@ Never runs as part of a live orchestrator run — invoked on demand or via
 the n8n scheduled workflow (Plan 3).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from asset_manager.ingestion.chunking import chunk_text, file_hash
@@ -21,6 +21,8 @@ class IngestionSummary:
     files_updated: int = 0
     files_deleted: int = 0
     files_skipped: int = 0
+    files_failed: int = 0
+    failed_files: list[str] = field(default_factory=list)
 
 
 def run_ingestion(
@@ -50,28 +52,37 @@ def run_ingestion(
                     summary.files_skipped += 1
                     continue
 
+                # Parse/chunk BEFORE touching the store — a file that fails
+                # to load (unsupported type, corrupt content, etc.) must not
+                # abort the rest of the batch, and an update's old chunks
+                # must not be deleted until the replacement is ready.
+                try:
+                    pages = load_document(content, remote_file.name)
+                    records = []
+                    for page_number, page_text in pages:
+                        for i, chunk in enumerate(chunk_text(page_text)):
+                            records.append(
+                                ChunkRecord(
+                                    id=f"{property_id}:{remote_file.name}:{page_number}:{i}",
+                                    text=chunk,
+                                    property_id=property_id,
+                                    source_type=source_type,
+                                    filename=remote_file.name,
+                                    page_or_row=page_number,
+                                    file_hash=new_hash,
+                                    ingested_at=now_fn(),
+                                )
+                            )
+                except Exception as exc:
+                    summary.files_failed += 1
+                    summary.failed_files.append(f"{remote_file.name}: {exc}")
+                    continue
+
                 if existing_hash is not None:
                     store.delete_by_filename(property_id, remote_file.name)
                     summary.files_updated += 1
                 else:
                     summary.files_added += 1
-
-                pages = load_document(content, remote_file.name)
-                records = []
-                for page_number, page_text in pages:
-                    for i, chunk in enumerate(chunk_text(page_text)):
-                        records.append(
-                            ChunkRecord(
-                                id=f"{property_id}:{remote_file.name}:{page_number}:{i}",
-                                text=chunk,
-                                property_id=property_id,
-                                source_type=source_type,
-                                filename=remote_file.name,
-                                page_or_row=page_number,
-                                file_hash=new_hash,
-                                ingested_at=now_fn(),
-                            )
-                        )
                 store.upsert_chunks(records)
 
         # Any file previously ingested for this property but no longer
@@ -124,8 +135,12 @@ def main() -> None:
     print(
         f"Ingestion complete: {summary.files_added} added, "
         f"{summary.files_updated} updated, {summary.files_deleted} deleted, "
-        f"{summary.files_skipped} skipped"
+        f"{summary.files_skipped} skipped, {summary.files_failed} failed"
     )
+    if summary.failed_files:
+        print("Failed files (skipped, did not stop the run):")
+        for failure in summary.failed_files:
+            print(f"  - {failure}")
 
 
 if __name__ == "__main__":

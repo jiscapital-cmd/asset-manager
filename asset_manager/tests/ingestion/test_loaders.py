@@ -1,6 +1,7 @@
 import io
 
 from docx import Document
+from openpyxl import Workbook
 from pypdf import PdfWriter
 
 from asset_manager.ingestion.loaders import (
@@ -8,6 +9,7 @@ from asset_manager.ingestion.loaders import (
     load_docx_text,
     load_pdf_text,
     load_text_file,
+    load_xlsx_text,
 )
 
 
@@ -61,3 +63,30 @@ def test_load_document_unknown_extension_raises():
 
     with pytest.raises(ValueError, match="Unsupported file type"):
         load_document(b"data", "file.xyz")
+
+
+def _make_xlsx_bytes() -> bytes:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Rent Roll"
+    ws.append(["Unit", "Tenant", "Rent"])
+    ws.append(["101", "Jane Doe", 1200])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_load_xlsx_text_includes_sheet_name_and_cell_values():
+    text = load_xlsx_text(_make_xlsx_bytes())
+    assert "Rent Roll" in text
+    assert "Unit" in text
+    assert "Jane Doe" in text
+    assert "1200" in text
+
+
+def test_load_document_dispatches_xlsx():
+    result = load_document(_make_xlsx_bytes(), "rent_roll.xlsx")
+    assert len(result) == 1
+    page_number, text = result[0]
+    assert page_number == 1
+    assert "Jane Doe" in text
