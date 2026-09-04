@@ -16,6 +16,7 @@ from asset_manager.agents.orchestrator_tools import (
     make_save_report_tool,
 )
 from asset_manager.app.model_config import AGENT_NAMES, AVAILABLE_MODELS, resolve_model_overrides
+from asset_manager.ingestion.ingest import SOURCE_TYPES
 from asset_manager.ingestion.store import ChromaStore
 from asset_manager.reports.archive import ReportArchive
 from asset_manager.retrieval.tools import make_retrieval_tool
@@ -149,55 +150,113 @@ def _render_new_messages(messages: list, already_rendered: int, container, call_
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-chat_col, steps_col = st.columns([2, 1])
+chat_tab, kb_tab = st.tabs(["💬 Chat", "📚 Knowledge Base"])
 
-with chat_col:
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+with chat_tab:
+    chat_col, steps_col = st.columns([2, 1])
 
-with steps_col:
-    st.markdown("### 🔍 Agent steps")
-    steps_placeholder = st.empty()
-    with steps_placeholder.container():
-        st.caption("Steps for the next question will appear here as they happen.")
-
-if question := st.chat_input("Ask about a property..."):
-    st.session_state.messages.append({"role": "user", "content": question})
     with chat_col:
-        with st.chat_message("user"):
-            st.markdown(question)
-
-        with st.chat_message("assistant"):
-            answer_placeholder = st.empty()
-            answer_placeholder.markdown("_Thinking..._")
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
     with steps_col:
-        steps_placeholder.empty()
-        steps_container = steps_placeholder.container()
+        st.markdown("### 🔍 Agent steps")
+        steps_placeholder = st.empty()
+        with steps_placeholder.container():
+            st.caption("Steps for the next question will appear here as they happen.")
 
-    model_map = resolve_model_overrides(default_model, overrides)
-    orchestrator = get_orchestrator(model_map["financial-agent"])
+    if question := st.chat_input("Ask about a property..."):
+        st.session_state.messages.append({"role": "user", "content": question})
+        with chat_col:
+            with st.chat_message("user"):
+                st.markdown(question)
 
-    rendered_count = 0
-    call_labels: dict[str, str] = {}
-    final_state = None
-    for state in orchestrator.stream({"messages": [{"role": "user", "content": question}]}, stream_mode="values"):
-        final_state = state
-        rendered_count = _render_new_messages(state["messages"], rendered_count, steps_container, call_labels)
+            with st.chat_message("assistant"):
+                answer_placeholder = st.empty()
+                answer_placeholder.markdown("_Thinking..._")
 
-    answer = final_state["messages"][-1].content if final_state else "(no response)"
-    answer_placeholder.markdown(answer)
-    st.session_state.messages.append({"role": "assistant", "content": answer})
+        with steps_col:
+            steps_placeholder.empty()
+            steps_container = steps_placeholder.container()
 
-    with chat_col:
-        from asset_manager.export.render import markdown_to_docx_bytes, markdown_to_pdf_bytes
+        model_map = resolve_model_overrides(default_model, overrides)
+        orchestrator = get_orchestrator(model_map["financial-agent"])
 
-        docx_bytes = markdown_to_docx_bytes("Asset Manager Report", answer)
-        pdf_bytes = markdown_to_pdf_bytes("Asset Manager Report", answer)
+        rendered_count = 0
+        call_labels: dict[str, str] = {}
+        final_state = None
+        for state in orchestrator.stream({"messages": [{"role": "user", "content": question}]}, stream_mode="values"):
+            final_state = state
+            rendered_count = _render_new_messages(state["messages"], rendered_count, steps_container, call_labels)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.download_button("Download as Word", docx_bytes, file_name="report.docx")
-        with col2:
-            st.download_button("Download as PDF", pdf_bytes, file_name="report.pdf")
+        answer = final_state["messages"][-1].content if final_state else "(no response)"
+        answer_placeholder.markdown(answer)
+        st.session_state.messages.append({"role": "assistant", "content": answer})
+
+        with chat_col:
+            from asset_manager.export.render import markdown_to_docx_bytes, markdown_to_pdf_bytes
+
+            docx_bytes = markdown_to_docx_bytes("Asset Manager Report", answer)
+            pdf_bytes = markdown_to_pdf_bytes("Asset Manager Report", answer)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.download_button("Download as Word", docx_bytes, file_name="report.docx")
+            with col2:
+                st.download_button("Download as PDF", pdf_bytes, file_name="report.pdf")
+
+with kb_tab:
+    st.markdown(
+        "Inspect exactly what `ingest.py` chunked, embedded, and stored in Chroma "
+        "— independent of any chat question, and a live similarity-search tester."
+    )
+
+    kb_property_ids = _load_property_ids_from_env()
+    if not kb_property_ids:
+        st.warning("No PROPERTY_FOLDER_* variables found in .env — nothing to browse yet.")
+    else:
+        filter_col1, filter_col2 = st.columns(2)
+        with filter_col1:
+            kb_property_id = st.selectbox("Property", kb_property_ids, key="kb_property_id")
+        with filter_col2:
+            kb_source_type = st.selectbox("Source type", ["(all)"] + SOURCE_TYPES, key="kb_source_type")
+
+        store = get_store()
+        chunks = store.list_chunks(
+            kb_property_id,
+            source_type=None if kb_source_type == "(all)" else kb_source_type,
+        )
+
+        unique_files = sorted({c["filename"] for c in chunks})
+        metric_col1, metric_col2 = st.columns(2)
+        metric_col1.metric("Chunks", len(chunks))
+        metric_col2.metric("Files", len(unique_files))
+
+        st.markdown("#### Chunks")
+        if not chunks:
+            st.caption("No chunks ingested yet for this property/source type. Run `python -m asset_manager.ingestion.ingest`.")
+        else:
+            for chunk in chunks:
+                header = f"{chunk['filename']} — p.{chunk['page_or_row']} — {chunk['source_type']}"
+                with st.expander(header):
+                    st.caption(f"ingested_at: {chunk['ingested_at']}  •  file_hash: {chunk['file_hash'][:12]}…")
+                    st.text(chunk["text"])
+
+        st.divider()
+        st.markdown("#### Test retrieval")
+        st.caption(
+            "Runs the exact same embedding + Chroma similarity search a subagent's "
+            "retrieval tool would run — see what actually comes back for a query."
+        )
+        test_query = st.text_input("Query", key="kb_test_query", placeholder="e.g. NOI budget variance")
+        test_source_type = st.selectbox("Search within source type", SOURCE_TYPES, key="kb_test_source_type")
+        if st.button("Run search", key="kb_test_run") and test_query:
+            with st.spinner("Embedding query and searching Chroma…"):
+                results = store.query(test_query, source_type=test_source_type, property_id=kb_property_id)
+            if not results:
+                st.caption("No results.")
+            else:
+                for r in results:
+                    with st.expander(f"[{r['filename']}, p.{r['page_or_row']}]"):
+                        st.text(r["text"])

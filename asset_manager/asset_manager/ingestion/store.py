@@ -82,3 +82,29 @@ class ChromaStore:
     def list_known_filenames(self, property_id: str) -> set[str]:
         result = self._collection.get(where={"property_id": property_id})
         return {m["filename"] for m in result["metadatas"]}
+
+    def list_chunks(self, property_id: str, source_type: str | None = None) -> list[dict]:
+        """Return every chunk for a property (optionally filtered by
+        source_type), full text + metadata, sorted by (filename, page_or_row)
+        — a non-semantic listing (no embedding/query involved), for
+        inspecting exactly what ingestion actually stored."""
+        where_clauses = [{"property_id": property_id}]
+        if source_type is not None:
+            where_clauses.append({"source_type": source_type})
+        where = where_clauses[0] if len(where_clauses) == 1 else {"$and": where_clauses}
+
+        result = self._collection.get(where=where)
+        chunks = [
+            {
+                "text": result["documents"][i],
+                "filename": m["filename"],
+                "page_or_row": m["page_or_row"],
+                "property_id": m["property_id"],
+                "source_type": m["source_type"],
+                "file_hash": m["file_hash"],
+                "ingested_at": m["ingested_at"],
+            }
+            for i, m in enumerate(result["metadatas"])
+        ]
+        chunks.sort(key=lambda c: (c["filename"], c["page_or_row"]))
+        return chunks
