@@ -95,7 +95,11 @@ def build_production_app() -> FastAPI:
     ]
 
     def _build_orchestrator():
-        model = ChatOpenAI(model=os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini"), base_url="https://openrouter.ai/api/v1")
+        model = ChatOpenAI(
+            model=os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
+            base_url="https://openrouter.ai/api/v1",
+            api_key=os.environ["OPENROUTER_API_KEY"],
+        )
         return build_orchestrator(
             model,
             make_retrieval_tool(store, "financial"),

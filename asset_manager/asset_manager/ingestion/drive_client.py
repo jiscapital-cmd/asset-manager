@@ -82,12 +82,18 @@ def build_drive_client(service_account_json_path: str) -> DriveClient:
 
     Not unit tested — requires real Google credentials. Verified in the
     manual smoke test (Task 10).
+
+    Scope is read/write ("drive", not "drive.readonly"): the same DriveClient
+    is used both for ingestion (read-only against raw_docs/) and for
+    ReportArchive (find_or_create_subfolder/upload_text_file against reports/,
+    added in Plan 2) — a read-only scope makes report saving fail with a 403
+    "Insufficient Permission" the first time a report is written.
     """
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
 
     credentials = service_account.Credentials.from_service_account_file(
-        service_account_json_path, scopes=["https://www.googleapis.com/auth/drive.readonly"]
+        service_account_json_path, scopes=["https://www.googleapis.com/auth/drive"]
     )
     service = build("drive", "v3", credentials=credentials)
     return DriveClient(service)

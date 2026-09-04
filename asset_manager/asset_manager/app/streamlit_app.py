@@ -62,7 +62,11 @@ def get_orchestrator(model_name: str):
     archive = get_archive()
     property_ids = _load_property_ids_from_env()
 
-    model = ChatOpenAI(model=model_name, base_url="https://openrouter.ai/api/v1")
+    model = ChatOpenAI(
+        model=model_name,
+        base_url="https://openrouter.ai/api/v1",
+        api_key=os.environ["OPENROUTER_API_KEY"],
+    )
     financial_tool = make_retrieval_tool(store, "financial")
     pm_tool = make_retrieval_tool(store, "pm")
     capex_tool = make_retrieval_tool(store, "capex")
