@@ -24,26 +24,8 @@
       "name": "Run Ingestion",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
+      "onError": "continueErrorOutput",
       "position": [420, 300]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-          "conditions": [
-            {
-              "leftValue": "={{ $json.statusCode }}",
-              "rightValue": 200,
-              "operator": { "type": "number", "operation": "equals" }
-            }
-          ],
-          "combinator": "and"
-        }
-      },
-      "name": "Succeeded?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [640, 300]
     },
     {
       "parameters": {
@@ -62,7 +44,7 @@
       "name": "Any Files Failed?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [860, 220]
+      "position": [640, 220]
     },
     {
       "parameters": {
@@ -76,7 +58,7 @@
       "name": "Alert: Ingestion Files Failed",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1080, 180]
+      "position": [860, 180]
     },
     {
       "parameters": {
@@ -84,19 +66,18 @@
         "method": "POST",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { \"text\": \"Asset Manager ingestion API returned a non-200 response (\" + $json.statusCode + \") calling \" + $json.url + \" — the automation API may be down.\" } }}",
+        "jsonBody": "={{ { \"text\": \"Asset Manager ingestion API call failed — the automation API may be unreachable or errored. Details: \" + JSON.stringify($json) } }}",
         "options": { "timeout": 10000 }
       },
       "name": "Alert: API Unreachable",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [860, 400]
+      "position": [640, 420]
     }
   ],
   "connections": {
     "Ingest Trigger": { "main": [[{ "node": "Run Ingestion", "type": "main", "index": 0 }]] },
-    "Run Ingestion": { "main": [[{ "node": "Succeeded?", "type": "main", "index": 0 }]] },
-    "Succeeded?": {
+    "Run Ingestion": {
       "main": [
         [{ "node": "Any Files Failed?", "type": "main", "index": 0 }],
         [{ "node": "Alert: API Unreachable", "type": "main", "index": 0 }]
@@ -107,6 +88,6 @@
     }
   },
   "meta": {
-    "description": "Calls the Asset Manager automation API (asset_manager.automation.api) every 15 minutes: POST /ingest/run, which walks Drive raw_docs/ and chunks/embeds/upserts any new or changed files into Chroma (asset_manager.ingestion.ingest.run_ingestion). A polling schedule trigger is used rather than Drive's native push-notification trigger — simpler to set up and more reliable, and cheap to poll often since ingestion is idempotent (unchanged files are skipped via content-hash) and already resilient to individual bad files (one unsupported/corrupt file is recorded in failed_files and skipped, not a batch-aborting crash — see ingest.py). Two alert paths, both distinct from anything the API can notify about on its own since ingestion has no SlackWebhookNotifier wired in: a non-200 response (API down or erroring) alerts via 'Alert: API Unreachable'; a 200 response that still reports failed > 0 (specific files that didn't parse) alerts via 'Alert: Ingestion Files Failed', naming the files, while the rest of the batch still completed normally."
+    "description": "Calls the Asset Manager automation API (asset_manager.automation.api) every 15 minutes: POST /ingest/run, which walks Drive raw_docs/ and chunks/embeds/upserts any new or changed files into Chroma (asset_manager.ingestion.ingest.run_ingestion). A polling schedule trigger is used rather than Drive's native push-notification trigger — simpler to set up and more reliable, and cheap to poll often given ingestion's own idempotency (unchanged files skipped via content-hash) and per-file resilience (one unsupported/corrupt file is recorded in failed_files and skipped, not a batch-aborting crash — see ingest.py). 'Run Ingestion' uses n8n's built-in onError: continueErrorOutput (two outputs: success/error) rather than manually inspecting a statusCode field on the response — the plain HTTP Request node's $json is just the parsed response body (e.g. {added, updated, ...}), with no statusCode/url fields present unless 'Full Response' mode is explicitly enabled, which this workflow does not use. Two alert paths: the node's ERROR output (API down, timed out, or returned a non-2xx) triggers 'Alert: API Unreachable' with the raw error JSON for diagnosis; a successful response that still reports failed > 0 (specific files that didn't parse) triggers 'Alert: Ingestion Files Failed', naming the files, while the rest of the batch still completed normally — distinguishing 'the API itself is broken' from 'the API ran fine but one document was bad', since ingestion has no SlackWebhookNotifier of its own to report the latter."
   }
 }

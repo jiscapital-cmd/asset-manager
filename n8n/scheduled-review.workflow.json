@@ -24,26 +24,8 @@
       "name": "Run Reviews",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
+      "onError": "continueErrorOutput",
       "position": [420, 180]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-          "conditions": [
-            {
-              "leftValue": "={{ $json.statusCode }}",
-              "rightValue": 200,
-              "operator": { "type": "number", "operation": "equals" }
-            }
-          ],
-          "combinator": "and"
-        }
-      },
-      "name": "Reviews Succeeded?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [640, 180]
     },
     {
       "parameters": {
@@ -57,26 +39,8 @@
       "name": "Run Portfolio Review",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
+      "onError": "continueErrorOutput",
       "position": [420, 360]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-          "conditions": [
-            {
-              "leftValue": "={{ $json.statusCode }}",
-              "rightValue": 200,
-              "operator": { "type": "number", "operation": "equals" }
-            }
-          ],
-          "combinator": "and"
-        }
-      },
-      "name": "Portfolio Succeeded?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [640, 360]
     },
     {
       "parameters": {
@@ -84,13 +48,13 @@
         "method": "POST",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { \"text\": \"Asset Manager scheduled review API returned a non-200 response (\" + $json.statusCode + \") calling \" + $json.url + \" — the automation API may be down. This is a total-outage alert, distinct from the per-property failure notifications the API itself sends when it is reachable.\" } }}",
+        "jsonBody": "={{ { \"text\": \"Asset Manager scheduled review API call failed — the automation API may be unreachable or errored. This is a total-outage alert, distinct from the per-property failure notifications the API itself sends when it is reachable. Details: \" + JSON.stringify($json) } }}",
         "options": { "timeout": 10000 }
       },
       "name": "Alert: API Unreachable",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [860, 300]
+      "position": [640, 300]
     }
   ],
   "connections": {
@@ -102,16 +66,14 @@
         ]
       ]
     },
-    "Run Reviews": { "main": [[{ "node": "Reviews Succeeded?", "type": "main", "index": 0 }]] },
-    "Reviews Succeeded?": {
+    "Run Reviews": {
       "main": [[], [{ "node": "Alert: API Unreachable", "type": "main", "index": 0 }]]
     },
-    "Run Portfolio Review": { "main": [[{ "node": "Portfolio Succeeded?", "type": "main", "index": 0 }]] },
-    "Portfolio Succeeded?": {
+    "Run Portfolio Review": {
       "main": [[], [{ "node": "Alert: API Unreachable", "type": "main", "index": 0 }]]
     }
   },
   "meta": {
-    "description": "Calls the Asset Manager automation API (asset_manager.automation.api) on the 1st of every month at 6am: POST /reviews/run for the per-property reviews, and POST /reviews/run-portfolio for a single cross-property digest (both run in parallel off the same trigger). The API itself sends Slack notifications per property/portfolio result when it is reachable (see SlackWebhookNotifier) — the 'Succeeded?' -> 'Alert: API Unreachable' branches in this workflow cover the case those in-API notifications can't: a non-200 response (or the API being down entirely), which needs its own alert since the API never got the chance to send one itself. This workflow's job is purely triggering the runs and reacting to their HTTP status — matching the spec's requirement that n8n triggers/reacts but the orchestrator never waits on it."
+    "description": "Calls the Asset Manager automation API (asset_manager.automation.api) on the 1st of every month at 6am: POST /reviews/run for the per-property reviews, and POST /reviews/run-portfolio for a single cross-property digest (both run in parallel off the same trigger). Both HTTP Request nodes use n8n's built-in onError: continueErrorOutput (two outputs: success/error) rather than manually inspecting a statusCode field on the response — the plain HTTP Request node's $json is just the parsed response body, with no statusCode/url fields present unless 'Full Response' mode is explicitly enabled, which this workflow does not use. The API itself sends Slack notifications per property/portfolio result when it is reachable (see SlackWebhookNotifier) — each node's ERROR output routes to 'Alert: API Unreachable', covering the case those in-API notifications can't: the API being unreachable, erroring, or timing out, which needs its own alert since the API never got the chance to send one itself. This workflow's job is purely triggering the runs and reacting to failures — matching the spec's requirement that n8n triggers/reacts but the orchestrator never waits on it."
   }
 }
