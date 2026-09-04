@@ -17,6 +17,7 @@ def create_app(
     export_pdf_fn,
     notify_fn,
     run_portfolio_review_fn=None,
+    run_ingest_fn=None,
 ) -> FastAPI:
     app = FastAPI(title="Asset Manager Automation API")
 
@@ -52,6 +53,28 @@ def create_app(
         )
         return {"reviewed": [result.property_id] if result is not None else []}
 
+    @app.post("/ingest/run")
+    def run_ingest_endpoint():
+        # Lets n8n trigger ingest.py's logic over HTTP (spec Section 6: "n8n
+        # ... watches the Drive raw_docs/ folder and triggers ingest.py on
+        # new files") instead of only being runnable as a local CLI script.
+        # A polling schedule trigger (see n8n/ingest.workflow.json) rather
+        # than Drive's native push-notification trigger — simpler and more
+        # reliable, and cheap to poll often since ingestion is already
+        # idempotent (content-hash skip) and resilient to individual bad
+        # files (files_failed/failed_files below, not a crash).
+        if run_ingest_fn is None:
+            raise HTTPException(status_code=501, detail="Ingestion is not configured for this app.")
+        summary = run_ingest_fn()
+        return {
+            "added": summary.files_added,
+            "updated": summary.files_updated,
+            "deleted": summary.files_deleted,
+            "skipped": summary.files_skipped,
+            "failed": summary.files_failed,
+            "failed_files": summary.failed_files,
+        }
+
     return app
 
 
@@ -73,6 +96,7 @@ def build_production_app() -> FastAPI:
     )
     from asset_manager.export.render import markdown_to_docx_bytes, markdown_to_pdf_bytes
     from asset_manager.ingestion.drive_client import build_drive_client
+    from asset_manager.ingestion.ingest import run_ingestion
     from asset_manager.ingestion.store import ChromaStore
     from asset_manager.notify.slack import SlackWebhookNotifier
     from asset_manager.reports.archive import ReportArchive
@@ -100,6 +124,12 @@ def build_production_app() -> FastAPI:
     all_property_ids = [
         k.removeprefix("PROPERTY_FOLDER_").lower() for k in os.environ if k.startswith("PROPERTY_FOLDER_")
     ]
+    property_folders = {
+        k.removeprefix("PROPERTY_FOLDER_").lower(): v for k, v in os.environ.items() if k.startswith("PROPERTY_FOLDER_")
+    }
+
+    def run_ingest_fn():
+        return run_ingestion(drive, store, property_folders)
 
     def _build_orchestrator():
         model = ChatOpenAI(
@@ -141,4 +171,5 @@ def build_production_app() -> FastAPI:
         export_pdf_fn=markdown_to_pdf_bytes,
         notify_fn=notifier.send,
         run_portfolio_review_fn=run_portfolio_review_fn,
+        run_ingest_fn=run_ingest_fn,
     )
