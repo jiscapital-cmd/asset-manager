@@ -50,3 +50,12 @@ def test_retrieval_tool_returns_no_results_message_when_empty():
     tool = make_retrieval_tool(_seeded_store(), source_type="capex")
     result = tool.invoke({"query": "reserve study", "property_id": "p1"})
     assert "No relevant" in result
+
+
+def test_retrieval_tool_resolves_property_id_variant_when_known_ids_given():
+    tool = make_retrieval_tool(_seeded_store(), source_type="financial", known_property_ids=["p1"])
+    # "P-1" doesn't exactly match the stored property_id "p1", but should
+    # resolve to it via the known_property_ids list rather than returning
+    # zero results.
+    result = tool.invoke({"query": "NOI", "property_id": "P-1"})
+    assert "$1.1M" in result

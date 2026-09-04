@@ -109,12 +109,12 @@ def build_production_app() -> FastAPI:
         )
         return build_orchestrator(
             model,
-            make_retrieval_tool(store, "financial"),
-            make_retrieval_tool(store, "pm"),
-            make_retrieval_tool(store, "capex"),
-            make_get_prior_report_tool(archive),
+            make_retrieval_tool(store, "financial", known_property_ids=all_property_ids),
+            make_retrieval_tool(store, "pm", known_property_ids=all_property_ids),
+            make_retrieval_tool(store, "capex", known_property_ids=all_property_ids),
+            make_get_prior_report_tool(archive, known_property_ids=all_property_ids),
             make_list_properties_tool(all_property_ids),
-            make_save_report_tool(archive),
+            make_save_report_tool(archive, known_property_ids=all_property_ids),
         )
 
     def run_review_fn(property_id: str) -> str:

@@ -72,12 +72,12 @@ def get_orchestrator(model_name: str):
         base_url="https://openrouter.ai/api/v1",
         api_key=os.environ["OPENROUTER_API_KEY"],
     )
-    financial_tool = make_retrieval_tool(store, "financial")
-    pm_tool = make_retrieval_tool(store, "pm")
-    capex_tool = make_retrieval_tool(store, "capex")
-    prior_report_tool = make_get_prior_report_tool(archive)
+    financial_tool = make_retrieval_tool(store, "financial", known_property_ids=property_ids)
+    pm_tool = make_retrieval_tool(store, "pm", known_property_ids=property_ids)
+    capex_tool = make_retrieval_tool(store, "capex", known_property_ids=property_ids)
+    prior_report_tool = make_get_prior_report_tool(archive, known_property_ids=property_ids)
     list_properties_tool = make_list_properties_tool(property_ids)
-    save_report_tool = make_save_report_tool(archive)
+    save_report_tool = make_save_report_tool(archive, known_property_ids=property_ids)
 
     return build_orchestrator(
         model,

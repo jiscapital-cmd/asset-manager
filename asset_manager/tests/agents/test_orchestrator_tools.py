@@ -45,3 +45,25 @@ def test_get_prior_report_tool_returns_content_when_present():
     tool = make_get_prior_report_tool(archive)
     result = tool.invoke({"property_id": "champions-pointe"})
     assert "Occupancy 94%" in result
+
+
+def test_get_prior_report_tool_resolves_property_id_variant_when_known_ids_given():
+    archive = FakeArchive()
+    archive.saved["champions_pointe"] = "# August report\nOccupancy 94%"
+    tool = make_get_prior_report_tool(archive, known_property_ids=["champions_pointe"])
+    result = tool.invoke({"property_id": "Champions Pointe"})
+    assert "Occupancy 94%" in result
+
+
+def test_save_report_tool_resolves_property_id_variant_when_known_ids_given():
+    archive = FakeArchive()
+    tool = make_save_report_tool(archive, known_property_ids=["champions_pointe"])
+    tool.invoke({"property_id": "Champions Pointe", "content": "# Report"})
+    assert archive.saved["champions_pointe"] == "# Report"
+
+
+def test_save_report_tool_leaves_unmatched_property_id_unchanged():
+    archive = FakeArchive()
+    tool = make_save_report_tool(archive, known_property_ids=["champions_pointe"])
+    tool.invoke({"property_id": "portfolio", "content": "# Portfolio Report"})
+    assert archive.saved["portfolio"] == "# Portfolio Report"
