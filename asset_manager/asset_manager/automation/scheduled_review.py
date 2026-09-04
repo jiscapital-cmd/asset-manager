@@ -21,6 +21,7 @@ def run_scheduled_review(
     export_docx_fn: Callable[[str, str], bytes],
     export_pdf_fn: Callable[[str, str], bytes],
     notify_fn: Callable[[str], None],
+    send_file_fn: Callable[[str, bytes], None] | None = None,
 ) -> list[ScheduledReviewResult]:
     results: list[ScheduledReviewResult] = []
 
@@ -42,6 +43,8 @@ def run_scheduled_review(
             )
         )
         notify_fn(f"Scheduled review for {property_id} is ready.")
+        if send_file_fn is not None:
+            send_file_fn(f"{property_id}-report.pdf", pdf_bytes)
 
     return results
 
@@ -51,6 +54,7 @@ def run_portfolio_review(
     export_docx_fn: Callable[[str, str], bytes],
     export_pdf_fn: Callable[[str, str], bytes],
     notify_fn: Callable[[str], None],
+    send_file_fn: Callable[[str, bytes], None] | None = None,
 ) -> ScheduledReviewResult | None:
     """Runs one cross-property portfolio review (spec Section 2, "Portfolio vs.
     property-specific queries") as its own scheduled job, distinct from the N
@@ -66,6 +70,8 @@ def run_portfolio_review(
     docx_bytes = export_docx_fn("portfolio", report_text)
     pdf_bytes = export_pdf_fn("portfolio", report_text)
     notify_fn("Scheduled portfolio review is ready.")
+    if send_file_fn is not None:
+        send_file_fn("portfolio-report.pdf", pdf_bytes)
     return ScheduledReviewResult(
         property_id="portfolio",
         report_text=report_text,

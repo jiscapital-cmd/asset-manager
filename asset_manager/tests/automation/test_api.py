@@ -67,6 +67,26 @@ def test_run_portfolio_review_returns_200_when_configured():
     assert body["reviewed"] == ["portfolio"]
 
 
+def test_run_reviews_sends_pdf_file_when_send_file_fn_configured():
+    sent_files = []
+
+    app = create_app(
+        all_property_ids=["champions-pointe"],
+        run_review_fn=lambda property_id: f"# Report for {property_id}",
+        export_docx_fn=lambda t, c: b"docx",
+        export_pdf_fn=lambda t, c: b"pdf-bytes",
+        notify_fn=lambda m: None,
+        send_file_fn=lambda filename, content: sent_files.append((filename, content)),
+    )
+    client = TestClient(app)
+    response = client.post("/reviews/run", json={})
+    assert response.status_code == 200
+    assert len(sent_files) == 1
+    filename, content = sent_files[0]
+    assert "champions-pointe" in filename
+    assert content == b"pdf-bytes"
+
+
 def test_run_ingest_returns_501_when_not_configured():
     client = TestClient(_build_test_app())
     response = client.post("/ingest/run")

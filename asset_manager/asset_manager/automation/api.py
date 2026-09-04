@@ -18,6 +18,7 @@ def create_app(
     notify_fn,
     run_portfolio_review_fn=None,
     run_ingest_fn=None,
+    send_file_fn=None,
 ) -> FastAPI:
     app = FastAPI(title="Asset Manager Automation API")
 
@@ -34,6 +35,7 @@ def create_app(
             export_docx_fn=export_docx_fn,
             export_pdf_fn=export_pdf_fn,
             notify_fn=notify_fn,
+            send_file_fn=send_file_fn,
         )
         return {"reviewed": [r.property_id for r in results]}
 
@@ -50,6 +52,7 @@ def create_app(
             export_docx_fn=export_docx_fn,
             export_pdf_fn=export_pdf_fn,
             notify_fn=notify_fn,
+            send_file_fn=send_file_fn,
         )
         return {"reviewed": [result.property_id] if result is not None else []}
 
@@ -99,6 +102,7 @@ def build_production_app() -> FastAPI:
     from asset_manager.ingestion.ingest import run_ingestion
     from asset_manager.ingestion.store import ChromaStore
     from asset_manager.notify.slack import SlackWebhookNotifier
+    from asset_manager.notify.slack_files import SlackFileUploader
     from asset_manager.reports.archive import ReportArchive
     from asset_manager.reports.local_store import LocalFileStore
     from asset_manager.retrieval.tools import make_retrieval_tool
@@ -120,6 +124,18 @@ def build_production_app() -> FastAPI:
     reports_root = os.environ.get("REPORTS_LOCAL_DIR", "knowledge_base/reports")
     archive = ReportArchive(LocalFileStore(reports_root), reports_root_folder_id=reports_root)
     notifier = SlackWebhookNotifier(os.environ["SLACK_WEBHOOK_URL"])
+    # File uploads need Slack's Web API (a bot token + channel id), not the
+    # Incoming Webhook URL above — webhooks can only post text. Optional:
+    # only wired up if both are configured, so this app still runs fine
+    # (text notifications only) without them.
+    slack_bot_token = os.environ.get("SLACK_BOT_TOKEN")
+    slack_channel_id = os.environ.get("SLACK_CHANNEL_ID")
+    send_file_fn = None
+    if slack_bot_token and slack_channel_id:
+        file_uploader = SlackFileUploader(bot_token=slack_bot_token, channel_id=slack_channel_id)
+
+        def send_file_fn(filename: str, content: bytes) -> None:
+            file_uploader.upload(filename, content, initial_comment=f"Scheduled report: {filename}")
 
     all_property_ids = [
         k.removeprefix("PROPERTY_FOLDER_").lower() for k in os.environ if k.startswith("PROPERTY_FOLDER_")
@@ -172,4 +188,5 @@ def build_production_app() -> FastAPI:
         notify_fn=notifier.send,
         run_portfolio_review_fn=run_portfolio_review_fn,
         run_ingest_fn=run_ingest_fn,
+        send_file_fn=send_file_fn,
     )

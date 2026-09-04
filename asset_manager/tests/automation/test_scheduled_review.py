@@ -76,6 +76,61 @@ def test_run_portfolio_review_returns_result_and_notifies():
     assert "ready" in notified[0].lower()
 
 
+def test_run_scheduled_review_sends_pdf_file_when_send_file_fn_given():
+    sent_files = []
+
+    result = run_scheduled_review(
+        property_ids=["champions-pointe"],
+        run_review_fn=lambda property_id: f"# Report for {property_id}",
+        export_docx_fn=lambda t, c: b"docx-bytes",
+        export_pdf_fn=lambda t, c: b"pdf-bytes",
+        notify_fn=lambda m: None,
+        send_file_fn=lambda filename, content: sent_files.append((filename, content)),
+    )
+
+    assert len(result) == 1
+    assert len(sent_files) == 1
+    filename, content = sent_files[0]
+    assert "champions-pointe" in filename
+    assert content == b"pdf-bytes"
+
+
+def test_run_scheduled_review_does_not_send_file_for_failed_property():
+    sent_files = []
+
+    def flaky_run_review(property_id: str) -> str:
+        raise RuntimeError("orchestrator timed out")
+
+    run_scheduled_review(
+        property_ids=["champions-pointe"],
+        run_review_fn=flaky_run_review,
+        export_docx_fn=lambda t, c: b"docx",
+        export_pdf_fn=lambda t, c: b"pdf",
+        notify_fn=lambda m: None,
+        send_file_fn=lambda filename, content: sent_files.append((filename, content)),
+    )
+
+    assert sent_files == []
+
+
+def test_run_portfolio_review_sends_pdf_file_when_send_file_fn_given():
+    sent_files = []
+
+    result = run_portfolio_review(
+        run_portfolio_review_fn=lambda: "# Portfolio Review",
+        export_docx_fn=lambda t, c: b"docx-bytes",
+        export_pdf_fn=lambda t, c: b"pdf-bytes",
+        notify_fn=lambda m: None,
+        send_file_fn=lambda filename, content: sent_files.append((filename, content)),
+    )
+
+    assert result is not None
+    assert len(sent_files) == 1
+    filename, content = sent_files[0]
+    assert "portfolio" in filename
+    assert content == b"pdf-bytes"
+
+
 def test_run_portfolio_review_returns_none_and_notifies_on_failure():
     notified = []
 
