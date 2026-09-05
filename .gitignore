@@ -21,6 +21,10 @@ asset_manager/service-account.json
 # Local Chroma vector DB and locally-saved reports (generated, not source)
 knowledge_base/
 asset_manager/knowledge_base/
+# Safety net: any other stray Chroma data directory, wherever it ends up
+# (contains real ingested document chunks, never source-controlled)
+chroma_db*/
+**/chroma_db*/
 
 # Other local-only projects in this workspace, not part of asset_manager
 # (unaudited for secrets — kept out of git deliberately)
