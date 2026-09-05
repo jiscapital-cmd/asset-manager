@@ -86,7 +86,6 @@ def build_production_app() -> FastAPI:
     uvicorn entrypoint, not used in tests."""
     import os
 
-    import chromadb
     from dotenv import load_dotenv
     from langchain_openai import ChatOpenAI
     from openai import OpenAI
@@ -98,6 +97,7 @@ def build_production_app() -> FastAPI:
         make_save_report_tool,
     )
     from asset_manager.export.render import markdown_to_docx_bytes, markdown_to_pdf_bytes
+    from asset_manager.ingestion.chroma_client import get_chroma_client
     from asset_manager.ingestion.drive_client import build_drive_client
     from asset_manager.ingestion.ingest import run_ingestion
     from asset_manager.ingestion.store import ChromaStore
@@ -115,7 +115,7 @@ def build_production_app() -> FastAPI:
         return [d.embedding for d in response.data]
 
     drive = build_drive_client(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
-    store = ChromaStore(chromadb.PersistentClient(path="knowledge_base/chroma_db"), embed_fn=embed_fn)
+    store = ChromaStore(get_chroma_client(), embed_fn=embed_fn)
     # Local disk, not Drive: a service account has no storage quota of its own
     # on a personal (non-Workspace) Google Drive, so it can't create new report
     # files there even with Editor access on the folder (see

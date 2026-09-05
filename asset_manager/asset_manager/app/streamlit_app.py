@@ -2,7 +2,6 @@
 
 import os
 
-import chromadb
 import streamlit as st
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, ToolMessage
@@ -16,6 +15,7 @@ from asset_manager.agents.orchestrator_tools import (
     make_save_report_tool,
 )
 from asset_manager.app.model_config import AGENT_NAMES, AVAILABLE_MODELS, resolve_model_overrides
+from asset_manager.ingestion.chroma_client import get_chroma_client
 from asset_manager.ingestion.ingest import SOURCE_TYPES
 from asset_manager.ingestion.store import ChromaStore
 from asset_manager.reports.archive import ReportArchive
@@ -43,7 +43,7 @@ def get_store() -> ChromaStore:
         response = client.embeddings.create(model="text-embedding-3-small", input=texts)
         return [d.embedding for d in response.data]
 
-    client = chromadb.PersistentClient(path="knowledge_base/chroma_db")
+    client = get_chroma_client()
     return ChromaStore(client, embed_fn=embed_fn)
 
 

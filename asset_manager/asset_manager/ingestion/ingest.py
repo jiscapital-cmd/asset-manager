@@ -113,12 +113,12 @@ def main() -> None:
 
     from dotenv import load_dotenv
 
+    from asset_manager.ingestion.chroma_client import get_chroma_client
     from asset_manager.ingestion.drive_client import build_drive_client
     from asset_manager.ingestion.store import ChromaStore
 
     load_dotenv()
 
-    import chromadb
     from openai import OpenAI
 
     def embed_fn(texts: list[str]) -> list[list[float]]:
@@ -127,8 +127,10 @@ def main() -> None:
         return [d.embedding for d in response.data]
 
     drive = build_drive_client(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
-    chroma_client = chromadb.PersistentClient(path="knowledge_base/chroma_db")
-    store = ChromaStore(chroma_client, embed_fn=embed_fn)
+    # Requires a `chroma run` server process (see chroma_client.py) — the CLI
+    # is now a client of the same shared server the Streamlit app and
+    # automation API use, not a separate direct-file reader/writer.
+    store = ChromaStore(get_chroma_client(), embed_fn=embed_fn)
     property_folders = _load_property_folders_from_env()
 
     summary = run_ingestion(drive, store, property_folders)
