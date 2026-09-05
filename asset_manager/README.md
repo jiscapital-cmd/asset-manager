@@ -27,6 +27,11 @@ documents; ingestion chunks/embeds them into Chroma. Reports save to local disk,
 Drive — a Google service account has no storage quota of its own on a personal
 (non-Workspace) Drive, so it can't create new files there even with folder access.
 
+Full diagrams: [`docs/diagrams/system-flow.svg`](docs/diagrams/system-flow.svg) (the
+pipeline above, both entry points) and
+[`docs/diagrams/two-wave-delegation.svg`](docs/diagrams/two-wave-delegation.svg) (the
+orchestrator's wave 1 → gate → wave 2 mechanism).
+
 ## Prerequisites
 
 - Python 3.11+ (developed against 3.12/3.13)

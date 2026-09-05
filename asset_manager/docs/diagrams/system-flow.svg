@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 560" role="img"
+     aria-label="Three swim lanes — interactive, shared pipeline, and n8n-automated — showing how a question or a schedule trigger both flow through Google Drive, ingest.py, Chroma, the orchestrator, and the report archive, ending in Streamlit chat or a Slack post.">
+  <title>Asset Manager — System Flow</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#59697A"></path>
+    </marker>
+    <style>
+      text { font-family: 'IBM Plex Mono', 'Consolas', monospace; }
+      .node-title { font-weight: 600; font-size: 13px; fill: #1F2E3A; }
+      .node-sub { font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 10.5px; fill: #59697A; }
+      .node-box { fill: #FFFFFF; stroke: #C7CDD3; stroke-width: 1.3; }
+      .lane-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; fill: #59697A; }
+      .arrow-line { stroke: #59697A; stroke-width: 1.4; fill: none; }
+      .arrow-label { font-size: 10.5px; fill: #59697A; }
+    </style>
+  </defs>
+
+  <rect width="1320" height="560" fill="#F6F3EC"></rect>
+
+  <!-- lane eyebrows -->
+  <text x="560" y="58" class="lane-label">INTERACTIVE</text>
+  <text x="40" y="258" class="lane-label">SHARED PIPELINE</text>
+  <text x="560" y="458" class="lane-label">AUTOMATED · N8N</text>
+
+  <!-- ============ INTERACTIVE LANE (y 70-140) ============ -->
+  <rect x="560" y="70" width="170" height="70" rx="7" class="node-box"></rect>
+  <text x="645" y="100" text-anchor="middle" class="node-title">Human</text>
+  <text x="645" y="116" text-anchor="middle" class="node-sub">asset manager</text>
+
+  <rect x="800" y="70" width="200" height="70" rx="7" class="node-box"></rect>
+  <text x="900" y="100" text-anchor="middle" class="node-title">Streamlit Chat</text>
+  <text x="900" y="116" text-anchor="middle" class="node-sub">:8501</text>
+
+  <line x1="730" y1="105" x2="795" y2="105" class="arrow-line" marker-end="url(#arrow)"></line>
+  <text x="762" y="95" text-anchor="middle" class="arrow-label">asks</text>
+
+  <!-- ============ SHARED LANE (y 270-340) ============ -->
+  <rect x="40" y="270" width="200" height="70" rx="7" class="node-box"></rect>
+  <text x="140" y="300" text-anchor="middle" class="node-title">Google Drive</text>
+  <text x="140" y="316" text-anchor="middle" class="node-sub">raw_docs/&lt;property&gt;/…</text>
+
+  <rect x="300" y="270" width="170" height="70" rx="7" class="node-box"></rect>
+  <text x="385" y="300" text-anchor="middle" class="node-title">ingest.py</text>
+  <text x="385" y="316" text-anchor="middle" class="node-sub">chunk → embed</text>
+
+  <rect x="530" y="270" width="210" height="70" rx="7" class="node-box"></rect>
+  <text x="635" y="300" text-anchor="middle" class="node-title">Chroma</text>
+  <text x="635" y="316" text-anchor="middle" class="node-sub">shared server · :8001</text>
+
+  <rect x="800" y="270" width="200" height="70" rx="7" class="node-box"></rect>
+  <text x="900" y="300" text-anchor="middle" class="node-title">Orchestrator</text>
+  <text x="900" y="316" text-anchor="middle" class="node-sub">deep agent</text>
+
+  <rect x="1060" y="270" width="220" height="70" rx="7" class="node-box"></rect>
+  <text x="1170" y="300" text-anchor="middle" class="node-title">Report Archive</text>
+  <text x="1170" y="316" text-anchor="middle" class="node-sub">local disk · .md/.pdf</text>
+
+  <line x1="240" y1="305" x2="295" y2="305" class="arrow-line" marker-end="url(#arrow)"></line>
+  <text x="267" y="295" text-anchor="middle" class="arrow-label">downloads</text>
+
+  <line x1="470" y1="305" x2="525" y2="305" class="arrow-line" marker-end="url(#arrow)"></line>
+  <text x="497" y="295" text-anchor="middle" class="arrow-label">embeds</text>
+
+  <line x1="740" y1="305" x2="795" y2="305" class="arrow-line" marker-end="url(#arrow)"></line>
+  <text x="767" y="295" text-anchor="middle" class="arrow-label">retrieves</text>
+
+  <line x1="1000" y1="305" x2="1055" y2="305" class="arrow-line" marker-end="url(#arrow)"></line>
+  <text x="1027" y="295" text-anchor="middle" class="arrow-label">writes</text>
+
+  <!-- interactive <-> shared connectors -->
+  <line x1="880" y1="140" x2="880" y2="265" class="arrow-line" marker-end="url(#arrow)"></line>
+  <text x="868" y="205" text-anchor="end" class="arrow-label">question</text>
+  <line x1="920" y1="265" x2="920" y2="140" class="arrow-line" marker-end="url(#arrow)"></line>
+  <text x="932" y="205" text-anchor="start" class="arrow-label">answer</text>
+
+  <!-- ============ AUTOMATED LANE (y 470-540) ============ -->
+  <rect x="560" y="470" width="170" height="70" rx="7" class="node-box"></rect>
+  <text x="645" y="500" text-anchor="middle" class="node-title">n8n</text>
+  <text x="645" y="516" text-anchor="middle" class="node-sub">schedule trigger</text>
+
+  <rect x="800" y="470" width="200" height="70" rx="7" class="node-box"></rect>
+  <text x="900" y="500" text-anchor="middle" class="node-title">Automation API</text>
+  <text x="900" y="516" text-anchor="middle" class="node-sub">FastAPI · :8000</text>
+
+  <rect x="1060" y="470" width="220" height="70" rx="7" class="node-box"></rect>
+  <text x="1170" y="500" text-anchor="middle" class="node-title">Slack</text>
+  <text x="1170" y="516" text-anchor="middle" class="node-sub">text + PDF upload</text>
+
+  <line x1="730" y1="505" x2="795" y2="505" class="arrow-line" marker-end="url(#arrow)"></line>
+  <text x="762" y="495" text-anchor="middle" class="arrow-label">triggers</text>
+
+  <line x1="1000" y1="505" x2="1055" y2="505" class="arrow-line" marker-end="url(#arrow)"></line>
+  <text x="1027" y="495" text-anchor="middle" class="arrow-label">notifies</text>
+
+  <!-- automated -> shared connectors -->
+  <line x1="900" y1="470" x2="900" y2="345" class="arrow-line" marker-end="url(#arrow)"></line>
+  <text x="912" y="410" text-anchor="start" class="arrow-label">monthly review</text>
+
+  <polyline points="850,470 850,400 385,400 385,345" class="arrow-line" fill="none" marker-end="url(#arrow)"></polyline>
+  <text x="500" y="392" text-anchor="middle" class="arrow-label">15-min ingest poll</text>
+</svg>
