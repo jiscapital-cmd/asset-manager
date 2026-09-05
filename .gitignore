@@ -21,3 +21,16 @@ asset_manager/service-account.json
 # Local Chroma vector DB and locally-saved reports (generated, not source)
 knowledge_base/
 asset_manager/knowledge_base/
+
+# Other local-only projects in this workspace, not part of asset_manager
+# (unaudited for secrets — kept out of git deliberately)
+/.agents/
+/.claude/
+/.python-version
+/Day4_HF_gradio/
+/codex/
+/gradio/
+/langgraph/
+/main.py
+/requirements.txt
+/useful.py
