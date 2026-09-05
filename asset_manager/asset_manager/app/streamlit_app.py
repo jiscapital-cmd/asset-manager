@@ -23,12 +23,12 @@ from asset_manager.retrieval.tools import make_retrieval_tool
 
 load_dotenv()
 
-st.set_page_config(page_title="Asset Manager", page_icon="🏢", layout="wide")
+st.set_page_config(page_title="Asset Manager", page_icon=":material/apartment:", layout="wide")
 st.title("Asset Manager")
 
 with st.sidebar:
     default_model = st.selectbox("Default model", AVAILABLE_MODELS, index=0)
-    with st.expander("Advanced: per-agent model overrides"):
+    with st.expander("Advanced: per-agent model overrides", icon=":material/tune:"):
         overrides = {}
         for agent_name in AGENT_NAMES:
             choice = st.selectbox(agent_name, ["(use default)"] + AVAILABLE_MODELS, key=agent_name)
@@ -111,12 +111,12 @@ def get_orchestrator(model_name: str):
 # get_prior_report, etc. — see agents/subagents.py).
 
 _TOOL_ICONS = {
-    "retrieve_financial_documents": "💰",
-    "retrieve_pm_documents": "🏢",
-    "retrieve_capex_documents": "🔧",
-    "get_prior_report": "📜",
-    "list_properties": "📋",
-    "save_report": "💾",
+    "retrieve_financial_documents": ":material/payments:",
+    "retrieve_pm_documents": ":material/apartment:",
+    "retrieve_capex_documents": ":material/construction:",
+    "get_prior_report": ":material/history:",
+    "list_properties": ":material/list:",
+    "save_report": ":material/save:",
 }
 
 _SUBAGENT_SIGNAL_TOOLS = {
@@ -132,7 +132,7 @@ def _describe_tool_call(name: str, args: dict) -> str:
         subagent = args.get("subagent_type", "?")
         description = args.get("description") or ""
         preview = description[:140] + ("…" if len(description) > 140 else "")
-        return f"🚀 Delegating to **{subagent}** — _{preview}_"
+        return f":material/arrow_forward: Delegating to **{subagent}** — _{preview}_"
     if name in _TOOL_ICONS:
         icon = _TOOL_ICONS[name]
         if name.startswith("retrieve_"):
@@ -143,7 +143,7 @@ def _describe_tool_call(name: str, args: dict) -> str:
             return f"{icon} Listing available properties"
         if name == "save_report":
             return f"{icon} Saving report for **{args.get('property_id', '?')}**"
-    return f"🔧 Calling `{name}`"
+    return f":material/settings: Calling `{name}`"
 
 
 class _StepRenderer:
@@ -164,7 +164,7 @@ class _StepRenderer:
                 lane = {"title_ph": None, "body": self._top_level_container, "resolved": "Orchestrator"}
             else:
                 title_ph = self._top_level_container.empty()
-                title_ph.markdown("**🧩 Subagent call — starting…**")
+                title_ph.markdown("**:material/hub: Subagent call — starting…**")
                 body = self._top_level_container.container()
                 lane = {"title_ph": title_ph, "body": body, "resolved": None}
             self._lanes[namespace] = lane
@@ -174,7 +174,7 @@ class _StepRenderer:
         if lane["resolved"] is None and tool_name in _SUBAGENT_SIGNAL_TOOLS:
             lane["resolved"] = _SUBAGENT_SIGNAL_TOOLS[tool_name]
             if lane["title_ph"] is not None:
-                lane["title_ph"].markdown(f"**🧩 Subagent: {lane['resolved']}**")
+                lane["title_ph"].markdown(f"**:material/hub: Subagent: {lane['resolved']}**")
 
     @staticmethod
     def _as_text(content) -> str:
@@ -193,26 +193,26 @@ class _StepRenderer:
                         label = _describe_tool_call(tool_call["name"], tool_call.get("args", {}))
                         self._call_labels[tool_call["id"]] = label
                         container.markdown(label)
-                        with container.expander("🧾 input", expanded=False):
+                        with container.expander("Input", expanded=False, icon=":material/data_object:"):
                             st.json(tool_call.get("args", {}))
                 elif isinstance(message, ToolMessage):
-                    label = self._call_labels.get(message.tool_call_id, f"🔧 `{message.name}`")
+                    label = self._call_labels.get(message.tool_call_id, f":material/settings: `{message.name}`")
                     content = self._as_text(message.content)
                     preview = content[:2000] + ("…" if len(content) > 2000 else "")
-                    with container.expander(f"✅ {label} — output", expanded=False):
+                    with container.expander(f"{label} — output", expanded=False):
                         st.text(preview)
                 elif isinstance(message, AIMessage) and message.content:
                     content = self._as_text(message.content)
                     if namespace == ():
                         self.final_answer = content
                     preview = content[:300] + ("…" if len(content) > 300 else "")
-                    container.caption(f"💬 {preview}")
+                    container.caption(f":material/chat_bubble: {preview}")
 
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-chat_tab, kb_tab = st.tabs(["💬 Chat", "📚 Knowledge Base"])
+chat_tab, kb_tab = st.tabs([":material/chat: Chat", ":material/menu_book: Knowledge base"])
 
 with chat_tab:
     chat_col, steps_col = st.columns([2, 1])
@@ -223,7 +223,7 @@ with chat_tab:
                 st.markdown(message["content"])
 
     with steps_col:
-        st.markdown("### 🔍 Agent steps")
+        st.markdown("### :material/route: Agent steps")
         steps_placeholder = st.empty()
         with steps_placeholder.container():
             st.caption("Steps for the next question will appear here as they happen.")
@@ -265,9 +265,13 @@ with chat_tab:
 
             col1, col2 = st.columns(2)
             with col1:
-                st.download_button("Download as Word", docx_bytes, file_name="report.docx")
+                st.download_button(
+                    "Download as Word", docx_bytes, file_name="report.docx", icon=":material/download:"
+                )
             with col2:
-                st.download_button("Download as PDF", pdf_bytes, file_name="report.pdf")
+                st.download_button(
+                    "Download as PDF", pdf_bytes, file_name="report.pdf", icon=":material/download:"
+                )
 
 with kb_tab:
     st.markdown(
@@ -296,7 +300,7 @@ with kb_tab:
         metric_col1.metric("Chunks", len(chunks))
         metric_col2.metric("Files", len(unique_files))
 
-        st.markdown("#### Chunks")
+        st.markdown("#### :material/list_alt: Chunks")
         if not chunks:
             st.caption("No chunks ingested yet for this property/source type. Run `python -m asset_manager.ingestion.ingest`.")
         else:
@@ -306,15 +310,14 @@ with kb_tab:
                     st.caption(f"ingested_at: {chunk['ingested_at']}  •  file_hash: {chunk['file_hash'][:12]}…")
                     st.text(chunk["text"])
 
-        st.divider()
-        st.markdown("#### Test retrieval")
+        st.markdown("#### :material/manage_search: Test retrieval")
         st.caption(
             "Runs the exact same embedding + Chroma similarity search a subagent's "
             "retrieval tool would run — see what actually comes back for a query."
         )
         test_query = st.text_input("Query", key="kb_test_query", placeholder="e.g. NOI budget variance")
         test_source_type = st.selectbox("Search within source type", SOURCE_TYPES, key="kb_test_source_type")
-        if st.button("Run search", key="kb_test_run") and test_query:
+        if st.button("Run search", key="kb_test_run", icon=":material/search:") and test_query:
             with st.spinner("Embedding query and searching Chroma…"):
                 results = store.query(test_query, source_type=test_source_type, property_id=kb_property_id)
             if not results:

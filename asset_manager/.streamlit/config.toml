@@ -1,0 +1,79 @@
+# Apple-inspired theme: Apple's own system-color palette (Human Interface
+# Guidelines systemColors — the actual iOS/macOS blue/green/orange/indigo/
+# pink/teal set, not a generic brand palette), Inter as the closest freely-
+# licensed stand-in for San Francisco, generous "continuous corner" radii,
+# and true-black OLED dark mode. Users can switch light/dark from the app's
+# settings menu since both [theme.light] and [theme.dark] are defined.
+
+[theme]
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+headingFont = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@600;700&display=swap"
+codeFont = "'JetBrains Mono':https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+baseFontSize = 15
+baseFontWeight = 400
+codeFontSize = "0.85rem"
+headingFontSizes = ["30px", "24px", "20px", "17px", "15px", "13px"]
+headingFontWeights = [700, 700, 600, 600, 600, 600]
+linkUnderline = false
+baseRadius = "14px"
+buttonRadius = "10px"
+showWidgetBorder = true
+showSidebarBorder = true
+
+[theme.light]
+primaryColor = "#007AFF"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F2F2F7"
+textColor = "#1C1C1E"
+borderColor = "#D1D1D6"
+linkColor = "#007AFF"
+codeBackgroundColor = "#F2F2F7"
+codeTextColor = "#1C1C1E"
+dataframeBorderColor = "#D1D1D6"
+dataframeHeaderBackgroundColor = "#F2F2F7"
+
+redColor = "#FF3B30"
+orangeColor = "#FF9500"
+yellowColor = "#FFCC00"
+greenColor = "#34C759"
+blueColor = "#007AFF"
+violetColor = "#5856D6"
+grayColor = "#8E8E93"
+
+chartCategoricalColors = ["#007AFF", "#34C759", "#FF9500", "#5856D6", "#FF2D55", "#30B0C7", "#8E8E93"]
+
+[theme.dark]
+primaryColor = "#0A84FF"
+backgroundColor = "#000000"
+secondaryBackgroundColor = "#1C1C1E"
+textColor = "#F2F2F7"
+borderColor = "#38383A"
+linkColor = "#0A84FF"
+codeBackgroundColor = "#1C1C1E"
+codeTextColor = "#F2F2F7"
+dataframeBorderColor = "#38383A"
+dataframeHeaderBackgroundColor = "#1C1C1E"
+
+redColor = "#FF453A"
+orangeColor = "#FF9F0A"
+yellowColor = "#FFD60A"
+greenColor = "#30D158"
+blueColor = "#0A84FF"
+violetColor = "#5E5CE6"
+grayColor = "#8E8E93"
+
+chartCategoricalColors = ["#0A84FF", "#30D158", "#FF9F0A", "#5E5CE6", "#FF375F", "#40C8E0", "#8E8E93"]
+
+[theme.light.sidebar]
+backgroundColor = "#F2F2F7"
+secondaryBackgroundColor = "#E5E5EA"
+textColor = "#1C1C1E"
+borderColor = "#D1D1D6"
+primaryColor = "#007AFF"
+
+[theme.dark.sidebar]
+backgroundColor = "#1C1C1E"
+secondaryBackgroundColor = "#2C2C2E"
+textColor = "#F2F2F7"
+borderColor = "#38383A"
+primaryColor = "#0A84FF"
