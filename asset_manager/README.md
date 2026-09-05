@@ -95,47 +95,103 @@ Copy `.env.example` to `.env` and fill in:
 
 Everything goes through **one shared Chroma server** — the Streamlit app, the
 automation API, and ingestion are all separate processes that must not open the local
-Chroma files directly (that caused real data-race errors in practice). Start it first,
-every time:
+Chroma files directly (that caused real data-race errors in practice). That means a
+**fixed startup order**: Chroma first, always — everything else depends on it being up.
+
+Each numbered step below is its own terminal window, left running. Stopping any of
+them stops that piece only; the others keep working until they need it.
+
+### 1. Chroma server (always first)
 
 ```bash
 chroma run --path knowledge_base/chroma_db --port 8001
 ```
 
-### Ingest documents
+Verify: `curl http://localhost:8001/api/v2/heartbeat` returns a JSON heartbeat.
+Leave this terminal running — every other piece below depends on it.
 
-Upload documents into the right Drive subfolders, then:
+### 2. Ingest documents (one-off, not a persistent process)
+
+Upload documents into the right Drive subfolders, then in a **new terminal**:
 
 ```bash
 python -m asset_manager.ingestion.ingest
 ```
 
-Safe to re-run — unchanged files are skipped (content-hash check), and one bad/
-unsupported file is recorded and skipped rather than aborting the whole batch.
+Expected output: `Ingestion complete: N added, N updated, N deleted, N skipped, N
+failed`. Safe to re-run any time — unchanged files are skipped (content-hash check),
+and one bad/unsupported file is recorded and skipped rather than aborting the whole
+batch. You don't need to keep this terminal open once it finishes; re-run it manually
+whenever you add documents, or set up step 5 below to do it automatically.
 
-### Chat UI
+### 3. Chat UI
+
+In a **new terminal**:
 
 ```bash
 streamlit run asset_manager/app/streamlit_app.py
 ```
 
-Opens at `http://localhost:8501` — a **💬 Chat** tab (with a live "Agent steps" panel
+Opens at `http://localhost:8501` — a **Chat** tab (with a live "Agent steps" panel
 showing every subagent delegation and tool call, down to the actual retrieval calls)
-and a **📚 Knowledge Base** tab (browse ingested chunks, test retrieval queries
-directly).
+and a **Knowledge base** tab (browse ingested chunks, test retrieval queries directly).
+This is enough on its own if you only want to ask questions manually — steps 4–7 are
+only needed for the scheduled/automated side (n8n).
 
-### Automation API (for n8n)
+### 4. Automation API (only if you want scheduled ingestion/reviews via n8n)
+
+In a **new terminal**:
 
 ```bash
 uvicorn asset_manager.automation.api:build_production_app --factory --port 8000
 ```
 
-Exposes `GET /health`, `POST /ingest/run`, `POST /reviews/run`,
-`POST /reviews/run-portfolio`. See `n8n/*.workflow.json` for importable n8n workflows
-that call these on a schedule (15-min polling for ingestion, monthly for reviews) — if
-n8n runs somewhere other than this machine (e.g. n8n Cloud), it can't reach
-`localhost` directly; tunnel it (`ngrok http 8000`) and use the tunnel URL in the
-workflow's HTTP Request nodes instead.
+Verify: `curl http://localhost:8000/health` returns `{"status":"ok"}`. Exposes
+`POST /ingest/run`, `POST /reviews/run`, `POST /reviews/run-portfolio` — this is what
+n8n calls, not something you use directly day to day.
+
+### 5. Make the API reachable from n8n
+
+- **n8n running on this same machine**: skip this step, use `http://localhost:8000`
+  directly in the workflow files.
+- **n8n running elsewhere (e.g. n8n Cloud)**: it can't reach `localhost` on your
+  machine at all. Tunnel it, in a **new terminal**:
+  ```bash
+  ngrok http 8000
+  ```
+  Copy the `https://....ngrok-free.dev` URL it prints — you'll paste this into n8n in
+  the next step. **This URL changes every time you restart `ngrok`** (free tier) — you
+  will need to re-paste it into n8n after any restart.
+
+### 6. Import and configure the n8n workflows
+
+In n8n: **Workflows → Import from File** → pick a file from `n8n/`:
+- `ingest.workflow.json` — polls `/ingest/run` every 15 minutes
+- `scheduled-review.workflow.json` — calls `/reviews/run` and `/reviews/run-portfolio`
+  monthly
+
+For each imported workflow:
+1. Open the HTTP Request node(s) and replace `http://localhost:8000` with your real
+   URL (the ngrok URL from step 5, or `http://localhost:8000` if n8n is local)
+2. If you configured Slack, paste your webhook URL into the `Alert: ...` nodes'
+   `url` field (they otherwise expect `$env.SLACK_WEBHOOK_URL`, which n8n doesn't read
+   from your `.env` automatically — see the workflow file's own notes)
+3. Click **Execute Workflow** on the trigger node once, manually, to confirm it
+   actually reaches your machine before relying on the schedule
+4. **Activate** the workflow (toggle in the top-right) so it keeps running on schedule
+
+### Quick reference: what needs to stay running, and why
+
+| Step | Process | Needed for |
+|---|---|---|
+| 1 | `chroma run` | Everything — always required |
+| 3 | `streamlit run` | Chat UI at `:8501` |
+| 4 | `uvicorn` (automation API) | n8n-triggered ingestion/reviews at `:8000` |
+| 5 | `ngrok` | Only if n8n is remote and needs to reach step 4 |
+
+Restarting your machine means restarting all of these, in order (1 → 3/4 → 5), before
+n8n's next scheduled run can succeed — and re-pasting a fresh `ngrok` URL into n8n if
+you're tunneling.
 
 ## Tests
 
