@@ -1,9 +1,8 @@
-# Apple-inspired theme: Apple's own system-color palette (Human Interface
-# Guidelines systemColors — the actual iOS/macOS blue/green/orange/indigo/
-# pink/teal set, not a generic brand palette), Inter as the closest freely-
-# licensed stand-in for San Francisco, generous "continuous corner" radii,
-# and true-black OLED dark mode. Users can switch light/dark from the app's
-# settings menu since both [theme.light] and [theme.dark] are defined.
+# PrimeAsset Realty Management theme: warm off-white "paper" canvas with a
+# single teal brand ramp (teal-700 primary, teal-800 deep, teal-50/100/200
+# tints), a slate "ink" text ramp, Inter throughout, and soft rounded
+# corners. Users can switch light/dark from the app's settings menu since
+# both [theme.light] and [theme.dark] are defined.
 
 [theme]
 font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
@@ -21,59 +20,59 @@ showWidgetBorder = true
 showSidebarBorder = true
 
 [theme.light]
-primaryColor = "#007AFF"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F2F2F7"
-textColor = "#1C1C1E"
-borderColor = "#D1D1D6"
-linkColor = "#007AFF"
-codeBackgroundColor = "#F2F2F7"
-codeTextColor = "#1C1C1E"
-dataframeBorderColor = "#D1D1D6"
-dataframeHeaderBackgroundColor = "#F2F2F7"
+primaryColor = "#0f766e"
+backgroundColor = "#f8fafc"
+secondaryBackgroundColor = "#f0fdfa"
+textColor = "#0f172a"
+borderColor = "#e2e8f0"
+linkColor = "#0f766e"
+codeBackgroundColor = "#f0fdfa"
+codeTextColor = "#0f172a"
+dataframeBorderColor = "#e2e8f0"
+dataframeHeaderBackgroundColor = "#f0fdfa"
 
-redColor = "#FF3B30"
-orangeColor = "#FF9500"
-yellowColor = "#FFCC00"
-greenColor = "#34C759"
-blueColor = "#007AFF"
-violetColor = "#5856D6"
-grayColor = "#8E8E93"
+redColor = "#e11d48"
+orangeColor = "#f59e0b"
+yellowColor = "#eab308"
+greenColor = "#0f766e"
+blueColor = "#0ea5e9"
+violetColor = "#7c3aed"
+grayColor = "#64748b"
 
-chartCategoricalColors = ["#007AFF", "#34C759", "#FF9500", "#5856D6", "#FF2D55", "#30B0C7", "#8E8E93"]
+chartCategoricalColors = ["#0f766e", "#14b8a6", "#99f6e4", "#115e59", "#64748b", "#94a3b8", "#0ea5e9"]
 
 [theme.dark]
-primaryColor = "#0A84FF"
-backgroundColor = "#000000"
-secondaryBackgroundColor = "#1C1C1E"
-textColor = "#F2F2F7"
-borderColor = "#38383A"
-linkColor = "#0A84FF"
-codeBackgroundColor = "#1C1C1E"
-codeTextColor = "#F2F2F7"
-dataframeBorderColor = "#38383A"
-dataframeHeaderBackgroundColor = "#1C1C1E"
+primaryColor = "#2dd4bf"
+backgroundColor = "#0f172a"
+secondaryBackgroundColor = "#134e4a"
+textColor = "#f0fdfa"
+borderColor = "#1e293b"
+linkColor = "#2dd4bf"
+codeBackgroundColor = "#134e4a"
+codeTextColor = "#f0fdfa"
+dataframeBorderColor = "#1e293b"
+dataframeHeaderBackgroundColor = "#134e4a"
 
-redColor = "#FF453A"
-orangeColor = "#FF9F0A"
-yellowColor = "#FFD60A"
-greenColor = "#30D158"
-blueColor = "#0A84FF"
-violetColor = "#5E5CE6"
-grayColor = "#8E8E93"
+redColor = "#fb7185"
+orangeColor = "#fbbf24"
+yellowColor = "#facc15"
+greenColor = "#2dd4bf"
+blueColor = "#38bdf8"
+violetColor = "#a78bfa"
+grayColor = "#94a3b8"
 
-chartCategoricalColors = ["#0A84FF", "#30D158", "#FF9F0A", "#5E5CE6", "#FF375F", "#40C8E0", "#8E8E93"]
+chartCategoricalColors = ["#2dd4bf", "#99f6e4", "#0f766e", "#5eead4", "#94a3b8", "#64748b", "#38bdf8"]
 
 [theme.light.sidebar]
-backgroundColor = "#F2F2F7"
-secondaryBackgroundColor = "#E5E5EA"
-textColor = "#1C1C1E"
-borderColor = "#D1D1D6"
-primaryColor = "#007AFF"
+backgroundColor = "#f0fdfa"
+secondaryBackgroundColor = "#ccfbf1"
+textColor = "#0f172a"
+borderColor = "#99f6e4"
+primaryColor = "#0f766e"
 
 [theme.dark.sidebar]
-backgroundColor = "#1C1C1E"
-secondaryBackgroundColor = "#2C2C2E"
-textColor = "#F2F2F7"
-borderColor = "#38383A"
-primaryColor = "#0A84FF"
+backgroundColor = "#134e4a"
+secondaryBackgroundColor = "#115e59"
+textColor = "#f0fdfa"
+borderColor = "#0f766e"
+primaryColor = "#2dd4bf"
