@@ -30,7 +30,9 @@ Drive — a Google service account has no storage quota of its own on a personal
 Full diagrams: [`docs/diagrams/system-flow.svg`](docs/diagrams/system-flow.svg) (the
 pipeline above, both entry points) and
 [`docs/diagrams/two-wave-delegation.svg`](docs/diagrams/two-wave-delegation.svg) (the
-orchestrator's wave 1 → gate → wave 2 mechanism).
+orchestrator's wave 1 → gate → wave 2 mechanism). An interactive version of both
+lives at the [Asset Manager Flow](https://claude.ai/code/artifact/fc72a975-0974-4907-8137-00741f9ac189)
+Claude artifact (private — visible only if you're signed in as its owner).
 
 ## Prerequisites
 
