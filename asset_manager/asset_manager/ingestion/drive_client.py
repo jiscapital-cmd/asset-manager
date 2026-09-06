@@ -78,7 +78,7 @@ class DriveClient:
 
 
 def build_drive_client(service_account_json_path: str) -> DriveClient:
-    """Construct a real DriveClient using a service account credentials file.
+    """Construct a real DriveClient using service account credentials.
 
     Not unit tested — requires real Google credentials. Verified in the
     manual smoke test (Task 10).
@@ -88,12 +88,26 @@ def build_drive_client(service_account_json_path: str) -> DriveClient:
     ReportArchive (find_or_create_subfolder/upload_text_file against reports/,
     added in Plan 2) — a read-only scope makes report saving fail with a 403
     "Insufficient Permission" the first time a report is written.
+
+    ``service_account_json_path`` may be either a path to a credentials JSON
+    file (the normal local-dev case) or the raw JSON content itself. The
+    latter supports hosts with no filesystem to place a key file on (e.g.
+    Streamlit Community Cloud's Secrets manager), where the whole JSON key is
+    pasted directly into an env var.
     """
+    import json
+    import os
+
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
 
-    credentials = service_account.Credentials.from_service_account_file(
-        service_account_json_path, scopes=["https://www.googleapis.com/auth/drive"]
-    )
+    scopes = ["https://www.googleapis.com/auth/drive"]
+    if os.path.isfile(service_account_json_path):
+        credentials = service_account.Credentials.from_service_account_file(
+            service_account_json_path, scopes=scopes
+        )
+    else:
+        info = json.loads(service_account_json_path)
+        credentials = service_account.Credentials.from_service_account_info(info, scopes=scopes)
     service = build("drive", "v3", credentials=credentials)
     return DriveClient(service)
