@@ -1,5 +1,18 @@
 """Streamlit chat UI for the Asset Manager orchestrator."""
 
+import sys
+from pathlib import Path
+
+# Streamlit Cloud runs this script directly and only installs whatever's in
+# requirements.txt (third-party packages) — it never runs `pip install -e .`
+# the way local development does, so the asset_manager package itself isn't
+# importable by default. This repo's layout is asset-manager/asset_manager/
+# asset_manager/app/streamlit_app.py — the project root two directories up
+# (containing the asset_manager/ package folder) needs to be on sys.path
+# before any `from asset_manager....` import, regardless of the working
+# directory Streamlit Cloud invokes this script from.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 import html
 import os
 import re
