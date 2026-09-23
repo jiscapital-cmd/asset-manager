@@ -6,7 +6,15 @@ from asset_manager.agents.prompts import (
 )
 
 
-def build_subagents(financial_tool, pm_tool, capex_tool, get_prior_report_tool) -> list[dict]:
+def build_subagents(
+    financial_tool,
+    pm_tool,
+    capex_tool,
+    get_prior_report_tool,
+    record_financial_kpis_tool,
+    record_pm_kpis_tool,
+    record_capex_kpis_tool,
+) -> list[dict]:
     return [
         {
             "name": "financial-agent",
@@ -15,7 +23,7 @@ def build_subagents(financial_tool, pm_tool, capex_tool, get_prior_report_tool) 
                 "Call with a specific property_id."
             ),
             "system_prompt": FINANCIAL_AGENT_PROMPT,
-            "tools": [financial_tool],
+            "tools": [financial_tool, record_financial_kpis_tool],
         },
         {
             "name": "pm-agent",
@@ -24,7 +32,7 @@ def build_subagents(financial_tool, pm_tool, capex_tool, get_prior_report_tool) 
                 "for one property. Call with a specific property_id."
             ),
             "system_prompt": PM_AGENT_PROMPT,
-            "tools": [pm_tool],
+            "tools": [pm_tool, record_pm_kpis_tool],
         },
         {
             "name": "capex-agent",
@@ -33,7 +41,7 @@ def build_subagents(financial_tool, pm_tool, capex_tool, get_prior_report_tool) 
                 "for one property. Call with a specific property_id."
             ),
             "system_prompt": CAPEX_AGENT_PROMPT,
-            "tools": [capex_tool],
+            "tools": [capex_tool, record_capex_kpis_tool],
         },
         {
             "name": "risk-agent",

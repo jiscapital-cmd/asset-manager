@@ -11,47 +11,36 @@ def _dummy_tool(name):
     return fn
 
 
-def test_build_orchestrator_returns_a_runnable_graph():
+def _build_orchestrator(**overrides):
     model = ChatOpenAI(model="gpt-4o-mini", api_key="test-key-not-used", base_url="https://openrouter.ai/api/v1")
-    graph = build_orchestrator(
-        model,
-        _dummy_tool("fin"),
-        _dummy_tool("pm"),
-        _dummy_tool("capex"),
-        _dummy_tool("prior"),
-        _dummy_tool("list_properties"),
-        _dummy_tool("save_report"),
+    args = dict(
+        model=model,
+        financial_tool=_dummy_tool("fin"),
+        pm_tool=_dummy_tool("pm"),
+        capex_tool=_dummy_tool("capex"),
+        get_prior_report_tool=_dummy_tool("prior"),
+        list_properties_tool=_dummy_tool("list_properties"),
+        save_report_tool=_dummy_tool("save_report"),
+        record_financial_kpis_tool=_dummy_tool("record_fin_kpis"),
+        record_pm_kpis_tool=_dummy_tool("record_pm_kpis"),
+        record_capex_kpis_tool=_dummy_tool("record_capex_kpis"),
         recursion_limit=42,
     )
+    args.update(overrides)
+    return build_orchestrator(**args)
+
+
+def test_build_orchestrator_returns_a_runnable_graph():
+    graph = _build_orchestrator()
     assert hasattr(graph, "invoke")
     assert hasattr(graph, "stream")
 
 
 def test_build_orchestrator_applies_recursion_limit():
-    model = ChatOpenAI(model="gpt-4o-mini", api_key="test-key-not-used", base_url="https://openrouter.ai/api/v1")
-    graph = build_orchestrator(
-        model,
-        _dummy_tool("fin"),
-        _dummy_tool("pm"),
-        _dummy_tool("capex"),
-        _dummy_tool("prior"),
-        _dummy_tool("list_properties"),
-        _dummy_tool("save_report"),
-        recursion_limit=42,
-    )
+    graph = _build_orchestrator()
     assert graph.config["recursion_limit"] == 42
 
 
 def test_build_orchestrator_includes_portfolio_and_archive_tools():
-    model = ChatOpenAI(model="gpt-4o-mini", api_key="test-key-not-used", base_url="https://openrouter.ai/api/v1")
-    graph = build_orchestrator(
-        model,
-        _dummy_tool("fin"),
-        _dummy_tool("pm"),
-        _dummy_tool("capex"),
-        _dummy_tool("prior"),
-        _dummy_tool("list_properties"),
-        _dummy_tool("save_report"),
-        recursion_limit=42,
-    )
+    graph = _build_orchestrator()
     assert hasattr(graph, "invoke")

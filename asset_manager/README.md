@@ -180,6 +180,21 @@ For each imported workflow:
    actually reaches your machine before relying on the schedule
 4. **Activate** the workflow (toggle in the top-right) so it keeps running on schedule
 
+### 7. Autonomous KPI monitoring (optional — no n8n needed)
+
+In a **new terminal**:
+
+```bash
+python -m asset_manager.automation.monitor
+```
+
+Unlike step 6's n8n-triggered `/reviews/run-portfolio` (which always notifies
+Slack whenever it's called), this process runs its own portfolio review on a
+timer (`MONITOR_INTERVAL_HOURS`, default 24) and only alerts Slack when a real
+number — occupancy, NOI variance, delinquency, lease rollover concentration,
+or critical CapEx items — crosses a threshold in `.env`. A quiet run (nothing
+breached) just logs a one-line status to this terminal; nothing is sent.
+
 ### Quick reference: what needs to stay running, and why
 
 | Step | Process | Needed for |
@@ -188,6 +203,7 @@ For each imported workflow:
 | 3 | `streamlit run` | Chat UI at `:8501` |
 | 4 | `uvicorn` (automation API) | n8n-triggered ingestion/reviews at `:8000` |
 | 5 | `ngrok` | Only if n8n is remote and needs to reach step 4 |
+| 7 | `python -m asset_manager.automation.monitor` | Self-scheduled KPI alerting, independent of n8n |
 
 Restarting your machine means restarting all of these, in order (1 → 3/4 → 5), before
 n8n's next scheduled run can succeed — and re-pasting a fresh `ngrok` URL into n8n if

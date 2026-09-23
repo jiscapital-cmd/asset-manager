@@ -24,6 +24,11 @@ from langchain_core.messages import AIMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from openai import OpenAI
 
+from asset_manager.agents.kpi_tools import (
+    make_record_capex_kpis_tool,
+    make_record_financial_kpis_tool,
+    make_record_pm_kpis_tool,
+)
 from asset_manager.agents.orchestrator import build_orchestrator
 from asset_manager.agents.orchestrator_tools import (
     make_get_prior_report_tool,
@@ -34,6 +39,7 @@ from asset_manager.app.model_config import AGENT_NAMES, AVAILABLE_MODELS, resolv
 from asset_manager.ingestion.chroma_client import get_chroma_client
 from asset_manager.ingestion.ingest import SOURCE_TYPES
 from asset_manager.ingestion.store import ChromaStore
+from asset_manager.monitoring.kpis import KPICollector
 from asset_manager.reports.archive import ReportArchive
 from asset_manager.retrieval.tools import make_retrieval_tool
 
@@ -278,10 +284,20 @@ def get_report_email_recipients() -> list[str]:
     return [addr.strip() for addr in raw.split(",") if addr.strip()]
 
 
+@st.cache_resource
+def get_kpi_collector() -> KPICollector:
+    # Not surfaced in the chat UI today — populated so financial/pm/capex-agent
+    # can call their record_*_kpis tools without erroring. Autonomous alerting
+    # on these numbers happens in automation/monitor.py's own scheduled runs,
+    # not here.
+    return KPICollector()
+
+
 def get_orchestrator(model_name: str):
     store = get_store()
     archive = get_archive()
     property_ids = _load_property_ids_from_env()
+    kpi_collector = get_kpi_collector()
 
     model = ChatOpenAI(
         model=model_name,
@@ -294,6 +310,9 @@ def get_orchestrator(model_name: str):
     prior_report_tool = make_get_prior_report_tool(archive, known_property_ids=property_ids)
     list_properties_tool = make_list_properties_tool(property_ids)
     save_report_tool = make_save_report_tool(archive, known_property_ids=property_ids)
+    record_financial_kpis_tool = make_record_financial_kpis_tool(kpi_collector, known_property_ids=property_ids)
+    record_pm_kpis_tool = make_record_pm_kpis_tool(kpi_collector, known_property_ids=property_ids)
+    record_capex_kpis_tool = make_record_capex_kpis_tool(kpi_collector, known_property_ids=property_ids)
 
     return build_orchestrator(
         model,
@@ -303,6 +322,9 @@ def get_orchestrator(model_name: str):
         prior_report_tool,
         list_properties_tool,
         save_report_tool,
+        record_financial_kpis_tool,
+        record_pm_kpis_tool,
+        record_capex_kpis_tool,
     )
 
 

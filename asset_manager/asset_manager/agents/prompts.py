@@ -42,6 +42,29 @@ _ANALYSIS_RULE = (
     "it appeared directly in a source document."
 )
 
+_KPI_RULE_FINANCIAL = (
+    "AUTONOMOUS MONITORING: Before finishing, call record_financial_kpis exactly once "
+    "for the property_id you analyzed, passing noi_variance_pct and delinquency_pct. "
+    "Use your best supported figure for each field, or pass null for any field you "
+    "marked DATA NOT AVAILABLE above. Never substitute an estimate or zero for a "
+    "missing figure."
+)
+
+_KPI_RULE_PM = (
+    "AUTONOMOUS MONITORING: Before finishing, call record_pm_kpis exactly once for "
+    "the property_id you analyzed, passing occupancy_pct and rollover_90d_pct. Use "
+    "your best supported figure for each field, or pass null for any field you "
+    "marked DATA NOT AVAILABLE above. Never substitute an estimate or zero for a "
+    "missing figure."
+)
+
+_KPI_RULE_CAPEX = (
+    "AUTONOMOUS MONITORING: Before finishing, call record_capex_kpis exactly once "
+    "for the property_id you analyzed, passing critical_capex_count (the number of "
+    "critical or overdue CapEx/maintenance items). Pass null if you marked this DATA "
+    "NOT AVAILABLE above. Never substitute an estimate or zero for a missing figure."
+)
+
 
 FINANCIAL_AGENT_PROMPT = f"""
 You are the financial-agent for an operational asset management system.
@@ -108,6 +131,8 @@ Report:
 Do not invent financial values.
 Do not perform calculations when the required inputs are missing.
 For CALCULATED metrics, cite the source facts used in the calculation.
+
+{_KPI_RULE_FINANCIAL}
 
 {_CITATION_RULE}
 
@@ -183,6 +208,8 @@ Report:
 
 Do not infer missing lease, tenant, marketing, or work-order information.
 
+{_KPI_RULE_PM}
+
 {_CITATION_RULE}
 
 {_DATA_RULE}
@@ -257,6 +284,8 @@ Report:
 
 Do not recommend replacement solely because an asset is old; condition, performance,
 inspection findings, or other evidence must support the recommendation.
+
+{_KPI_RULE_CAPEX}
 
 {_CITATION_RULE}
 

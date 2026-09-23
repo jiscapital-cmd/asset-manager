@@ -25,9 +25,20 @@ def build_orchestrator(
     get_prior_report_tool,
     list_properties_tool,
     save_report_tool,
+    record_financial_kpis_tool,
+    record_pm_kpis_tool,
+    record_capex_kpis_tool,
     recursion_limit: int = DEFAULT_RECURSION_LIMIT,
 ):
-    subagents = build_subagents(financial_tool, pm_tool, capex_tool, get_prior_report_tool)
+    subagents = build_subagents(
+        financial_tool,
+        pm_tool,
+        capex_tool,
+        get_prior_report_tool,
+        record_financial_kpis_tool,
+        record_pm_kpis_tool,
+        record_capex_kpis_tool,
+    )
     graph = create_deep_agent(
         model=model,
         tools=[list_properties_tool, save_report_tool],
