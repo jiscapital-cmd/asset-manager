@@ -84,6 +84,7 @@ def create_app(
 def build_production_app() -> FastAPI:
     """Wires create_app() to real Drive/Chroma/LLM/Slack — imported by the
     uvicorn entrypoint, not used in tests."""
+    from asset_manager.agents.report_extraction import extract_final_report
     from asset_manager.automation.production import ProductionDependencies
     from asset_manager.export.render import markdown_to_docx_bytes, markdown_to_pdf_bytes
     from asset_manager.monitoring.kpis import KPICollector
@@ -99,7 +100,7 @@ def build_production_app() -> FastAPI:
         orchestrator = deps.build_orchestrator(KPICollector())
         question = f"Review property {property_id} and produce this period's report."
         result = orchestrator.invoke({"messages": [{"role": "user", "content": question}]})
-        return result["messages"][-1].content
+        return extract_final_report(result["messages"])
 
     def run_portfolio_review_fn() -> str:
         # A distinct scheduled call using the orchestrator's portfolio-mode
@@ -110,7 +111,7 @@ def build_production_app() -> FastAPI:
             "occupancy, and CapEx risk, ranked, and produce this period's cross-property report."
         )
         result = orchestrator.invoke({"messages": [{"role": "user", "content": question}]})
-        return result["messages"][-1].content
+        return extract_final_report(result["messages"])
 
     return create_app(
         all_property_ids=deps.all_property_ids,

@@ -94,6 +94,7 @@ def build_production_monitor() -> Callable[[], MonitorRunResult]:
     """Wires run_monitor_once to real Drive/Chroma/LLM/Slack — imported by
     the `python -m asset_manager.automation.monitor` entrypoint, not used in
     tests."""
+    from asset_manager.agents.report_extraction import extract_final_report
     from asset_manager.automation.production import ProductionDependencies
     from asset_manager.export.render import markdown_to_pdf_bytes
     from asset_manager.monitoring.kpis import KPICollector, load_thresholds_from_env
@@ -109,7 +110,7 @@ def build_production_monitor() -> Callable[[], MonitorRunResult]:
             "occupancy, and CapEx risk, ranked, and produce this period's cross-property report."
         )
         result = orchestrator.invoke({"messages": [{"role": "user", "content": question}]})
-        return result["messages"][-1].content, kpi_collector.all()
+        return extract_final_report(result["messages"]), kpi_collector.all()
 
     def run_once() -> MonitorRunResult:
         return run_monitor_once(

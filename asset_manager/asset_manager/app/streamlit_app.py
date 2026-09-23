@@ -459,7 +459,13 @@ class _StepRenderer:
                 elif isinstance(message, AIMessage) and message.content:
                     content = self._as_text(message.content)
                     if namespace == ():
-                        self.final_answer = content
+                        # The orchestrator sometimes sends one more short
+                        # wrap-up message after the real report (e.g. "the
+                        # report has been saved") — keep the longest top-level
+                        # message seen, not just the last one, so that
+                        # courtesy line never displaces the actual report.
+                        if len(content) > len(self.final_answer or ""):
+                            self.final_answer = content
                     preview = content[:300] + ("…" if len(content) > 300 else "")
                     container.caption(f":material/chat_bubble: {preview}")
                     self.events.append({"type": "chat_text", "namespace": namespace, "content": preview})

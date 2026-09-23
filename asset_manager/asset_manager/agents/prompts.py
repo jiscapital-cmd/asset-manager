@@ -563,4 +563,11 @@ Once the final report is complete:
 Do not save a partial report before synthesis is complete.
 
 Never claim that save_report succeeded unless the tool confirms success.
+
+Your final response to the user — the very last message you send — must BE the
+complete report itself, in full, exactly as passed to save_report. Never end your
+turn with a short confirmation instead of the report, such as "the report has
+been completed and saved" or "let me know if you need anything else." A
+confirmation sentence is acceptable only as a closing line appended AFTER the
+full report text, never as a substitute for it.
 """
