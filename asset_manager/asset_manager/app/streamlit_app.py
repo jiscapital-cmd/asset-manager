@@ -250,6 +250,34 @@ def get_archive() -> ReportArchive:
     return ReportArchive(LocalFileStore(reports_root), reports_root_folder_id=reports_root)
 
 
+def email_is_configured() -> bool:
+    return bool(
+        os.environ.get("SMTP_HOST")
+        and os.environ.get("SMTP_USERNAME")
+        and os.environ.get("SMTP_PASSWORD")
+        and os.environ.get("SMTP_SENDER")
+        and os.environ.get("REPORT_EMAIL_RECIPIENTS")
+    )
+
+
+@st.cache_resource
+def get_email_notifier():
+    from asset_manager.notify.email import EmailNotifier
+
+    return EmailNotifier(
+        smtp_host=os.environ["SMTP_HOST"],
+        smtp_port=int(os.environ.get("SMTP_PORT", "465")),
+        username=os.environ["SMTP_USERNAME"],
+        password=os.environ["SMTP_PASSWORD"],
+        sender=os.environ["SMTP_SENDER"],
+    )
+
+
+def get_report_email_recipients() -> list[str]:
+    raw = os.environ.get("REPORT_EMAIL_RECIPIENTS", "")
+    return [addr.strip() for addr in raw.split(",") if addr.strip()]
+
+
 def get_orchestrator(model_name: str):
     store = get_store()
     archive = get_archive()
@@ -704,6 +732,36 @@ with st.sidebar:
 # --- Main area ----------------------------------------------------------------
 
 
+def _render_report_actions(docx_bytes: bytes, pdf_bytes: bytes, key_suffix: str) -> None:
+    show_email = email_is_configured()
+    columns = st.columns(3 if show_email else 2)
+    with columns[0]:
+        st.download_button(
+            "Download as Word", docx_bytes, file_name="report.docx", icon=":material/download:", key=f"docx_{key_suffix}"
+        )
+    with columns[1]:
+        st.download_button(
+            "Download as PDF", pdf_bytes, file_name="report.pdf", icon=":material/download:", key=f"pdf_{key_suffix}"
+        )
+    if show_email:
+        with columns[2]:
+            if st.button("Send by email", icon=":material/mail:", key=f"email_{key_suffix}"):
+                recipients = get_report_email_recipients()
+                try:
+                    get_email_notifier().send_report(
+                        subject="Asset Manager report",
+                        body="See the attached report.",
+                        recipients=recipients,
+                        attachments=[
+                            ("report.docx", docx_bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+                            ("report.pdf", pdf_bytes, "application/pdf"),
+                        ],
+                    )
+                    st.success(f"Report emailed to {', '.join(recipients)}.")
+                except Exception as exc:
+                    st.error(f"Failed to send email: {exc}")
+
+
 def render_chat() -> None:
     chat = st.session_state.chats[st.session_state.current_chat_id]
 
@@ -714,23 +772,7 @@ def render_chat() -> None:
                     _render_steps_static(hist_status, message["steps"])
             render_report_or_markdown(message["content"])
             if message["role"] == "assistant" and message.get("docx") is not None:
-                dl_col1, dl_col2 = st.columns(2)
-                with dl_col1:
-                    st.download_button(
-                        "Download as Word",
-                        message["docx"],
-                        file_name="report.docx",
-                        icon=":material/download:",
-                        key=f"docx_{message['id']}",
-                    )
-                with dl_col2:
-                    st.download_button(
-                        "Download as PDF",
-                        message["pdf"],
-                        file_name="report.pdf",
-                        icon=":material/download:",
-                        key=f"pdf_{message['id']}",
-                    )
+                _render_report_actions(message["docx"], message["pdf"], key_suffix=message["id"])
 
     question = None
 
@@ -786,15 +828,7 @@ def render_chat() -> None:
             docx_bytes = markdown_to_docx_bytes("Asset Manager Report", answer)
             pdf_bytes = markdown_to_pdf_bytes("Asset Manager Report", answer)
 
-            dl_col1, dl_col2 = st.columns(2)
-            with dl_col1:
-                st.download_button(
-                    "Download as Word", docx_bytes, file_name="report.docx", icon=":material/download:", key="docx_live"
-                )
-            with dl_col2:
-                st.download_button(
-                    "Download as PDF", pdf_bytes, file_name="report.pdf", icon=":material/download:", key="pdf_live"
-                )
+            _render_report_actions(docx_bytes, pdf_bytes, key_suffix="live")
 
         chat["messages"].append(
             {
