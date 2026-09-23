@@ -34,6 +34,19 @@ def run_monitor_once(
         notify_fn(f"Autonomous monitoring run failed: {exc}")
         return MonitorRunResult(ran=False, alerted=True)
 
+    if not kpis_by_property:
+        # Observed in practice: the orchestrator can complete without error
+        # but skip delegating to any subagent, so no record_*_kpis tool call
+        # ever fires. Silently logging "0 properties checked, no breaches"
+        # would be indistinguishable from a genuinely healthy portfolio —
+        # treat an empty result as an incomplete run, not a clean one.
+        notify_fn(
+            "Autonomous monitoring run completed without any property KPI data — "
+            "the review may not have completed as expected. No alert conditions "
+            "could be evaluated this cycle."
+        )
+        return MonitorRunResult(ran=True, alerted=True, report_text=report_text)
+
     breaches: dict[str, list[str]] = {}
     for property_id, kpis in kpis_by_property.items():
         property_breaches = evaluate_kpis(kpis, thresholds)

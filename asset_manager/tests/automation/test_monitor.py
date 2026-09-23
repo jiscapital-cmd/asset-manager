@@ -113,6 +113,33 @@ def test_run_monitor_once_notifies_and_marks_not_ran_on_review_failure():
     assert "failed" in notified[0].lower()
 
 
+def test_run_monitor_once_alerts_when_no_property_kpi_data_was_recorded():
+    """Regression: a live run once completed without error but the
+    orchestrator never delegated to any subagent, so kpi_collector.all()
+    came back empty — silently logging "0 properties checked, no breaches"
+    would have looked identical to a genuinely healthy portfolio. An empty
+    result must be treated as an incomplete run, not a clean one."""
+    notified = []
+    logged = []
+
+    def fake_run_portfolio_review():
+        return "# Portfolio Review", {}
+
+    result = run_monitor_once(
+        run_portfolio_review_fn=fake_run_portfolio_review,
+        thresholds=THRESHOLDS,
+        export_pdf_fn=lambda t, c: b"pdf-bytes",
+        notify_fn=lambda m: notified.append(m),
+        log_fn=lambda m: logged.append(m),
+    )
+
+    assert result.ran is True
+    assert result.alerted is True
+    assert result.breaches == {}
+    assert len(notified) == 1
+    assert "no property kpi data" in notified[0].lower() or "not have completed" in notified[0].lower()
+
+
 def test_run_monitor_once_missing_data_never_causes_a_breach():
     def fake_run_portfolio_review():
         return "# Portfolio Review", _kpis("champions-pointe")  # every field None
